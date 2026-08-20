@@ -1,4 +1,5 @@
 import { config } from './config.js';
+import { nextTier, record } from './usage.js';
 
 /**
  * Errors we surface to the UI in plain language rather than as HTTP noise.
@@ -7,6 +8,21 @@ export class ApiError extends Error {
   constructor(message: string, readonly status?: number, readonly retryable = false) {
     super(message);
     this.name = 'ApiError';
+  }
+}
+
+/**
+ * Raised when the monthly free allowance is spent and paid credit is either switched off or
+ * also exhausted. Distinct from BudgetExceededError, which is a per-query ceiling: this one
+ * means the account itself has nothing left to spend.
+ */
+export class QuotaExhaustedError extends Error {
+  constructor() {
+    super(
+      'The Solana Tracker free allowance for this period is spent. Enable paid credit in .env ' +
+        '(PAID_CREDITS_ENABLED and PAID_CREDIT_LIMIT) to continue, or wait for the monthly reset.',
+    );
+    this.name = 'QuotaExhaustedError';
   }
 }
 
@@ -109,6 +125,12 @@ async function request<T>(
 
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     opts.budget.spend();
+
+    // Checked per attempt, not per call: a retry costs another request against the account,
+    // so a run that crosses the allowance boundary mid-retry must stop there.
+    const tier = nextTier();
+    if (tier === null) throw new QuotaExhaustedError();
+
     await limiter.acquire();
 
     let res: Response;
@@ -124,6 +146,8 @@ async function request<T>(
         signal: AbortSignal.timeout(30_000),
       });
     } catch (err) {
+      // Deliberately not recorded: the request never reached Solana Tracker, so it cost
+      // nothing on their side and must not count against the allowance. Only responses do.
       lastError = new ApiError(
         `Couldn't reach Solana Tracker (${(err as Error).message}). Check your connection.`,
         undefined,
@@ -132,6 +156,8 @@ async function request<T>(
       await sleep(backoffMs(attempt));
       continue;
     }
+
+    record('solanatracker', tier, path, res.ok);
 
     if (res.ok) {
       return (await res.json()) as T;

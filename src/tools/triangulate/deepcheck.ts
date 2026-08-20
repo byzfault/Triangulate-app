@@ -1,5 +1,5 @@
-import { api, type RequestBudget } from './client.js';
-import { cache } from './cache.js';
+import { api, type RequestBudget } from '../../shared/client.js';
+import { cache } from '../../shared/cache.js';
 import type { DeepCheckData } from './scoring/types.js';
 
 /**

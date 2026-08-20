@@ -1,4 +1,4 @@
-import type { ResultRow, TokenMeta } from '../types.js';
+import type { ResultRow, TokenMeta } from '../../../shared/types.js';
 
 /** A price series for one token, used to value a wallet's entry. */
 export interface PriceSeries {

@@ -1,4 +1,4 @@
-import type { ResultRow } from '../types.js';
+import type { ResultRow } from '../../../shared/types.js';
 import { scoringConfig, type ScoringConfig } from './config.js';
 import { checkExclusions } from './exclusions.js';
 import type { ComponentFn, ComponentScore, ScoreBreakdown, ScoringContext } from './types.js';

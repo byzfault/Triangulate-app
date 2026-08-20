@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Copy Tracker</title>
+<link rel="icon" href="/shared/copytracker-logo.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/shared/base.css">
+<link rel="stylesheet" href="/shared/nav.css">
+<link rel="stylesheet" href="/copytracker/styles.css">
+</head>
+<body>
+
+<div class="nav" id="nav" data-tool="copytracker"></div>
+
+<header class="brand">
+  <img class="brand-mark" src="/shared/copytracker-logo-wordmark.svg" alt="Copy Tracker" width="470" height="120">
+  <p class="brand-tag">Work out which wallets a trader is copying</p>
+</header>
+
+<div class="layout layout-wide">
+<div class="card" id="card">
+  <div class="card-header">
+    <h1>Enter a wallet, then the tokens it bought</h1>
+  </div>
+  <div class="card-body">
+    <form id="form" novalidate>
+      <label class="field-label" for="follower">Wallet to trace</label>
+      <div class="row">
+        <input type="text" id="follower" class="addr" placeholder="The wallet you follow" spellcheck="false" autocomplete="off">
+      </div>
+      <p class="field-note">The public wallet you suspect is copying someone else.</p>
+
+      <label class="field-label">Tokens it bought</label>
+      <div id="rows"></div>
+      <div class="quick-fill">
+        <button type="button" class="btn-add" id="add">+ Add token address</button>
+      </div>
+      <p class="field-note">
+        Two is the minimum and more is much better — a wallet leading on one coin is a
+        coincidence, on four it is a pattern.
+      </p>
+
+      <details class="filters" id="filters">
+        <summary>Settings</summary>
+        <div class="filters-body">
+          <label class="check">
+            <span>Look back
+              <input type="number" id="windowSecs" value="60" min="2" max="600" class="num"> seconds before each buy
+              <em>the gap a copy bot needs. Wider finds more candidates, but they score worse
+              because the timing gets less consistent.</em></span>
+          </label>
+          <label class="check">
+            <input type="checkbox" id="firstBuyOnly" checked>
+            <span>First buy of each token only
+              <em>the entry is the copied decision; later adds happen on the copier's own schedule</em></span>
+          </label>
+          <label class="check">
+            <span>Only list wallets that led at least
+              <input type="number" id="minHits" value="2" min="1" max="50" class="num"> times</span>
+          </label>
+          <label class="check">
+            <span>…across at least
+              <input type="number" id="minTokens" value="2" min="1" max="8" class="num"> different tokens
+              <em>this is the elimination step — noise rarely repeats across coins</em></span>
+          </label>
+          <p class="filters-foot">Every buy analysed is kept on record. Run this again next week
+            with new tokens and the same wallet's confidence sharpens, because the score is
+            computed over everything ever seen — not just today's search.</p>
+        </div>
+      </details>
+
+      <button type="submit" class="btn-submit" id="submit" disabled>
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true">
+          <path d="M4 18 L10 12 L14 15 L20 7"></path>
+          <circle cx="20" cy="7" r="1.6"></circle>
+        </svg>
+        Trace Sources
+      </button>
+      <p class="hint" id="hint">Enter a wallet and at least 2 token addresses</p>
+    </form>
+
+    <div class="progress" id="progress" hidden>
+      <ul class="progress-list" id="progressList"></ul>
+      <p class="counter" id="counter">0 API requests</p>
+    </div>
+
+    <div class="notices" id="notices"></div>
+  </div>
+</div>
+
+<aside class="card panel panel-candidates" id="candidatePanel">
+  <div class="card-header">
+    <h1>Suspected sources</h1>
+  </div>
+  <div class="panel-body">
+    <p class="panel-status" id="candStatus">Run a trace to see who this wallet buys behind.</p>
+    <div class="table-scroll" id="candScroll" hidden>
+      <table class="cand-table">
+        <thead>
+          <tr>
+            <th>Wallet</th>
+            <th class="num-col">Conf.</th>
+            <th class="num-col">Leads</th>
+            <th class="num-col">Lead time</th>
+          </tr>
+        </thead>
+        <tbody id="candBody"></tbody>
+      </table>
+    </div>
+    <p class="panel-foot" id="candFoot"></p>
+  </div>
+</aside>
+</div>
+
+<section class="results" id="results" hidden>
+  <div class="results-head">
+    <div>
+      <h2 id="resultsTitle">Buys analysed</h2>
+      <p class="results-sub" id="resultsSub"></p>
+    </div>
+    <button type="button" class="btn-csv" id="csv">Export CSV</button>
+  </div>
+  <div class="table-scroll">
+    <table id="table">
+      <thead id="thead"></thead>
+      <tbody id="tbody"></tbody>
+    </table>
+  </div>
+  <p class="empty" id="empty" hidden></p>
+  <footer class="usage" id="usage"></footer>
+</section>
+
+<section class="results" id="loggerSection">
+  <div class="results-head">
+    <div>
+      <h2>Free trade logger</h2>
+      <p class="results-sub">
+        Watches tokens through GeckoTerminal, which is free and unmetered. Any buy window it
+        has already recorded is analysed at no API cost, so tracking a token before the wallet
+        moves again makes the next trace cheaper — or free.
+      </p>
+    </div>
+    <button type="button" class="btn-csv" id="loggerToggle">Start</button>
+  </div>
+  <div class="logger-add">
+    <input type="text" id="trackMint" class="addr" placeholder="Token mint to watch for free" spellcheck="false" autocomplete="off">
+    <button type="button" class="btn-add" id="trackBtn">Watch token</button>
+  </div>
+  <div class="table-scroll">
+    <table>
+      <thead>
+        <tr><th>Token</th><th class="num-col">Trades logged</th><th>Last poll</th><th></th></tr>
+      </thead>
+      <tbody id="trackedBody"></tbody>
+    </table>
+  </div>
+  <p class="empty" id="loggerEmpty">No tokens are being watched yet.</p>
+  <footer class="usage" id="loggerFoot"></footer>
+</section>
+
+<script src="/shared/nav.js"></script>
+<script src="/copytracker/app.js"></script>
+</body>
+</html>

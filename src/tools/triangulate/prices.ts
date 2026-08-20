@@ -1,7 +1,7 @@
-import { api, BudgetExceededError, type RequestBudget } from './client.js';
-import { cache } from './cache.js';
+import { api, BudgetExceededError, type RequestBudget } from '../../shared/client.js';
+import { cache } from '../../shared/cache.js';
 import type { PriceSeries } from './scoring/types.js';
-import type { TokenMeta } from './types.js';
+import type { TokenMeta } from '../../shared/types.js';
 
 /** Their response key is `oclhv`, not `ohlcv` — that spelling is theirs, not a typo here. */
 interface ChartResponse {

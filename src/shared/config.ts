@@ -8,6 +8,12 @@ function num(name: string, fallback: number): number {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
+function bool(name: string, fallback: boolean): boolean {
+  const raw = process.env[name];
+  if (raw === undefined || raw.trim() === '') return fallback;
+  return /^(1|true|yes|on)$/i.test(raw.trim());
+}
+
 export const config = {
   port: num('PORT', 3000),
   apiKey: (process.env.SOLANA_TRACKER_API_KEY ?? '').trim(),
@@ -23,6 +29,24 @@ export const config = {
   anchorWalletCap: num('ANCHOR_WALLET_CAP', 2000),
   cacheTtlHours: num('CACHE_TTL_HOURS', 24),
   dbPath: resolve(process.cwd(), process.env.DB_PATH ?? './data/cache.sqlite'),
+
+  // --- Cost control -------------------------------------------------------------------
+  /**
+   * Solana Tracker's monthly free allowance. Requests beyond it either stop or spend paid
+   * credit, depending on the two settings below — never silently.
+   */
+  freeMonthlyLimit: num('SOLANA_TRACKER_FREE_MONTHLY', 10_000),
+  /** Day of the month the allowance resets. Clamped to 1–28 so every month has one. */
+  quotaResetDay: num('QUOTA_RESET_DAY', 1),
+  /** Paid credit is opt-in: without this, work stops when the free allowance runs out. */
+  paidEnabled: bool('PAID_CREDITS_ENABLED', false),
+  /** Ceiling on paid requests per period, so an unattended job can't run up a bill. */
+  paidCreditLimit: num('PAID_CREDIT_LIMIT', 0),
+  /**
+   * How long the free background logger sleeps between polls of each tracked pool.
+   * GeckoTerminal is unmetered but rate limited, so this is politeness, not economy.
+   */
+  loggerIntervalSecs: num('LOGGER_INTERVAL_SECS', 90),
 };
 
 /**

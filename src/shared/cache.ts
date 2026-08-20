@@ -1,14 +1,7 @@
-import Database from 'better-sqlite3';
-import { mkdirSync } from 'node:fs';
-import { dirname } from 'node:path';
 import { config } from './config.js';
+import { db } from './db.js';
 import type { Position, TokenMeta, TrackRecord, TrendingToken } from './types.js';
-import type { DeepCheckData, PriceSeries } from './scoring/types.js';
-
-mkdirSync(dirname(config.dbPath), { recursive: true });
-
-const db = new Database(config.dbPath);
-db.pragma('journal_mode = WAL');
+import type { DeepCheckData, PriceSeries } from '../tools/triangulate/scoring/types.js';
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS token_meta (

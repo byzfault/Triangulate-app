@@ -114,7 +114,7 @@ export interface ResultRow {
     bot: boolean;
   };
   /** Filled in by the scoring pass; null if scoring was skipped. */
-  score: import('./scoring/types.js').ScoreBreakdown | null;
+  score: import('../tools/triangulate/scoring/types.js').ScoreBreakdown | null;
 }
 
 export interface TrendingToken {

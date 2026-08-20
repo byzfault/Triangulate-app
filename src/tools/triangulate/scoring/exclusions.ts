@@ -1,4 +1,4 @@
-import type { ResultRow } from '../types.js';
+import type { ResultRow } from '../../../shared/types.js';
 import type { ScoringContext } from './types.js';
 import type { ScoringConfig } from './config.js';
 import { median } from './util.js';

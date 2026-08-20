@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
+  <!-- Copy Tracker logo mark: a trailing wallet echoes the one it follows -->
+  <!-- The source wallet, leading -->
+  <circle cx="34" cy="42" r="13" fill="#4dc0b5"/>
+  <circle cx="34" cy="42" r="5.5" fill="#ffffff"/>
+  <!-- The follower, one step behind and smaller -->
+  <circle cx="86" cy="78" r="9.5" fill="#47555f"/>
+  <!-- Echo trail: the copy, lagging -->
+  <g stroke="#4dc0b5" stroke-width="2.5" stroke-dasharray="1 6" stroke-linecap="round" fill="none">
+    <path d="M45 51 L75 71"/>
+  </g>
+  <!-- Ghost copies fading behind the leader, the pattern being traced back -->
+  <circle cx="52" cy="55" r="4" fill="#cfd9de"/>
+  <circle cx="66" cy="65" r="3" fill="#e4e9ec"/>
+  <!-- Sight ring around the source: this is the wallet being identified -->
+  <circle cx="34" cy="42" r="21" fill="none" stroke="#cfd9de" stroke-width="3" stroke-dasharray="4 5"/>
+</svg>

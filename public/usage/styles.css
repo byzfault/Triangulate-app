@@ -1,0 +1,73 @@
+/* API usage page. */
+
+.usage-title{
+  font-size:26px;
+  font-weight:600;
+  color:var(--label);
+  letter-spacing:0.2px;
+}
+
+.usage-grid{
+  display:flex;
+  gap:20px;
+  align-items:stretch;
+  justify-content:center;
+  width:100%;
+  max-width:1100px;
+  flex-wrap:wrap;
+}
+.tier-card{flex:1 1 300px;max-width:none;display:flex;flex-direction:column;}
+.tier-card .card-body{display:flex;flex-direction:column;flex:1;}
+
+.tier-figure{
+  font-size:32px;
+  font-weight:600;
+  color:var(--label);
+  font-variant-numeric:tabular-nums;
+  line-height:1.1;
+}
+.tier-sub{
+  font-size:11.5px;
+  color:var(--muted);
+  margin-top:2px;
+}
+.tier-note{
+  font-size:12px;
+  color:var(--text);
+  line-height:1.5;
+  margin-top:12px;
+}
+.tier-foot{
+  font-size:11px;
+  color:var(--muted);
+  margin-top:auto;
+  padding-top:12px;
+}
+.tier-foot code{
+  font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+  font-size:10.5px;
+  background:#f2f5f7;
+  padding:1px 4px;
+  border-radius:3px;
+}
+
+.meter{
+  height:7px;
+  background:#e6ecef;
+  border-radius:4px;
+  overflow:hidden;
+  margin-top:10px;
+}
+.meter span{
+  display:block;
+  height:100%;
+  width:0;
+  background:var(--teal);
+  transition:width .3s ease;
+}
+.meter span.is-warm{background:#d19a3e;}
+.meter span.is-hot{background:var(--neg);}
+
+.tier-card.is-off .tier-figure{color:var(--muted);}
+
+.num-col{text-align:right;}

@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>API Usage</title>
+<link rel="icon" href="/shared/triangulate-logo.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/shared/base.css">
+<link rel="stylesheet" href="/shared/nav.css">
+<link rel="stylesheet" href="/usage/styles.css">
+</head>
+<body>
+
+<div class="nav" id="nav" data-tool="usage"></div>
+
+<header class="brand">
+  <h1 class="usage-title">API Usage</h1>
+  <p class="brand-tag">What the suite has spent, and what is left</p>
+</header>
+
+<div class="usage-grid">
+  <section class="card tier-card" id="freeCard">
+    <div class="card-header"><h1>Free · GeckoTerminal</h1></div>
+    <div class="card-body">
+      <p class="tier-figure" id="freeCount">—</p>
+      <p class="tier-sub">requests this period</p>
+      <p class="tier-note">
+        Keyless and unmetered. Powers the trending panels and the background trade logger,
+        and never touches the Solana Tracker allowance. Anything answered here is genuinely
+        free — there is no cap to run out of.
+      </p>
+      <p class="tier-foot" id="freeAllTime"></p>
+    </div>
+  </section>
+
+  <section class="card tier-card" id="quotaCard">
+    <div class="card-header"><h1>Quota · Solana Tracker free tier</h1></div>
+    <div class="card-body">
+      <p class="tier-figure" id="quotaCount">—</p>
+      <p class="tier-sub" id="quotaSub">of the monthly allowance</p>
+      <div class="meter"><span id="quotaBar"></span></div>
+      <p class="tier-note">
+        The metered allowance every search and trace draws on. When it runs out, work stops
+        unless paid credit is switched on — deliberately, so a background job can never
+        quietly start costing money.
+      </p>
+      <p class="tier-foot" id="quotaReset"></p>
+    </div>
+  </section>
+
+  <section class="card tier-card" id="paidCard">
+    <div class="card-header"><h1>Paid · credit</h1></div>
+    <div class="card-body">
+      <p class="tier-figure" id="paidCount">—</p>
+      <p class="tier-sub" id="paidSub">paid requests this period</p>
+      <div class="meter"><span id="paidBar"></span></div>
+      <p class="tier-note" id="paidNote"></p>
+      <p class="tier-foot">
+        Enable with <code>PAID_CREDITS_ENABLED=true</code> and a <code>PAID_CREDIT_LIMIT</code>
+        in <code>.env</code>. The limit is a hard ceiling per period, not a target.
+      </p>
+    </div>
+  </section>
+</div>
+
+<section class="results">
+  <div class="results-head">
+    <div>
+      <h2>Daily breakdown</h2>
+      <p class="results-sub">Requests per day this period, split by what they cost.</p>
+    </div>
+  </div>
+  <div class="table-scroll">
+    <table>
+      <thead>
+        <tr><th>Day</th><th class="num-col">Free</th><th class="num-col">Quota</th><th class="num-col">Paid</th><th class="num-col">Total</th></tr>
+      </thead>
+      <tbody id="dailyBody"></tbody>
+    </table>
+  </div>
+  <p class="empty" id="dailyEmpty" hidden>Nothing recorded yet this period.</p>
+</section>
+
+<section class="results">
+  <div class="results-head">
+    <div>
+      <h2>Where the requests went</h2>
+      <p class="results-sub">
+        Grouped by endpoint shape. Wallet and token addresses are stripped before anything is
+        written, so this stays a record of shapes rather than a second copy of what you searched.
+      </p>
+    </div>
+  </div>
+  <div class="table-scroll">
+    <table>
+      <thead>
+        <tr><th>Endpoint</th><th>Provider</th><th>Tier</th><th class="num-col">Calls</th></tr>
+      </thead>
+      <tbody id="endpointBody"></tbody>
+    </table>
+  </div>
+  <p class="empty" id="endpointEmpty" hidden>Nothing recorded yet this period.</p>
+  <footer class="usage" id="foot"></footer>
+</section>
+
+<script src="/shared/nav.js"></script>
+<script src="/usage/app.js"></script>
+</body>
+</html>

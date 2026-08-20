@@ -1,4 +1,4 @@
-import type { Position, TokenMeta } from './types.js';
+import type { Position, TokenMeta } from '../../shared/types.js';
 
 /**
  * Solana Tracker's docs describe several nesting shapes for the same figures across the
