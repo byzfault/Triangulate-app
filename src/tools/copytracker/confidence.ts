@@ -54,6 +54,18 @@ export const confidenceConfig = {
     fullMarks: 4,
   },
 
+  /**
+   * Lead frequency is scored on the absolute number of leads, not the share of all buys.
+   *
+   * A wallet usually copies several sources, not one — so each genuine source only accounts
+   * for a slice of its buys. Scoring share-of-total would give three real sources 0.33 each
+   * and bury all of them beneath a single lucky coincidence. Five leads is a pattern whether
+   * the follower made six buys or sixty.
+   */
+  leadCount: {
+    fullMarks: 5,
+  },
+
   lift: {
     /** At or below this, the wallet leads no more often than its raw activity predicts. */
     none: 1,
@@ -178,10 +190,10 @@ export function rankCandidates(
     const components: ComponentScore[] = [
       {
         key: 'hitRate',
-        label: 'Lead frequency',
+        label: 'Times in front',
         weight: cfg.weights.hitRate,
         raw: `${hits} of ${totalEvents} buys`,
-        score: hits / totalEvents,
+        score: ramp(hits, 1, cfg.leadCount.fullMarks),
         measured: true,
       },
       {

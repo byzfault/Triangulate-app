@@ -3,6 +3,9 @@
   const BASE58 = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
 
   const followerEl = document.getElementById('follower');
+  const labelEl = document.getElementById('followerLabel');
+  const savedPick = document.getElementById('savedPick');
+  const followerNote = document.getElementById('followerNote');
   const rowsEl = document.getElementById('rows');
   const addBtn = document.getElementById('add');
   const submitBtn = document.getElementById('submit');
@@ -36,6 +39,7 @@
   let rows = ['', ''];
   let lastResult = null;
   let expanded = null;
+  let followers = [];
 
   // ---- form -----------------------------------------------------------------------------
 
@@ -110,8 +114,63 @@
 
   followerEl.addEventListener('input', () => {
     markValidity(followerEl, followerEl.value.trim());
+    // Typing an address by hand should still recognise a wallet already on file.
+    const known = followers.find((f) => f.follower === followerEl.value.trim());
+    savedPick.value = known ? known.follower : '';
+    if (known && !labelEl.value) labelEl.value = known.label || '';
+    describeFollower(known);
     updateSubmit();
   });
+
+  savedPick.addEventListener('change', () => {
+    const f = followers.find((x) => x.follower === savedPick.value);
+    followerEl.value = f ? f.follower : '';
+    labelEl.value = f ? f.label || '' : '';
+    markValidity(followerEl, followerEl.value);
+    describeFollower(f);
+    updateSubmit();
+  });
+
+  /** Says what is already on record, so it is obvious a trace is adding to a case file. */
+  function describeFollower(f) {
+    if (!f) {
+      followerNote.textContent =
+        'The public wallet you suspect is copying someone else. Name it and every trace you run adds to the same case file.';
+      return;
+    }
+    followerNote.textContent =
+      `Already on record: ${f.events} buy${f.events === 1 ? '' : 's'} across ${f.tokens} token` +
+      `${f.tokens === 1 ? '' : 's'}, ${f.repeat_candidates} wallet${f.repeat_candidates === 1 ? '' : 's'} ` +
+      `seen leading on 2+ of them. New tokens build on this rather than replacing it.`;
+  }
+
+  async function refreshFollowers(selectAddr) {
+    try {
+      const res = await fetch('/api/copy/followers');
+      followers = (await res.json()).followers || [];
+    } catch {
+      followers = [];
+    }
+    const chosen = selectAddr || savedPick.value;
+    savedPick.innerHTML =
+      '<option value="">New wallet…</option>' +
+      followers
+        .map(
+          (f) =>
+            '<option value="' +
+            f.follower +
+            '">' +
+            escapeHtml(f.label || shortAddr(f.follower)) +
+            ' · ' +
+            f.events +
+            ' buy' +
+            (f.events === 1 ? '' : 's') +
+            (f.repeat_candidates ? ' · ' + f.repeat_candidates + ' repeat' : '') +
+            '</option>',
+        )
+        .join('');
+    if (chosen) savedPick.value = chosen;
+  }
 
   addBtn.addEventListener('click', () => {
     if (rows.length < MAX_ROWS) {
@@ -173,6 +232,7 @@
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
           follower,
+          label: labelEl.value.trim() || null,
           mints,
           options: {
             windowSecs: numOf('windowSecs', 60),
@@ -224,6 +284,7 @@
         lastResult = e.result;
         renderCandidates(e.result);
         renderEvents(e.result);
+        refreshFollowers(e.result.follower);
       } else if (e.type === 'error') {
         src.close();
         finish();
@@ -550,6 +611,7 @@
 
   render();
   updateSubmit();
+  refreshFollowers();
   refreshLogger();
   setInterval(refreshLogger, 30000);
 })();

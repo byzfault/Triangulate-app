@@ -73,6 +73,15 @@ db.exec(`
   );
   CREATE INDEX IF NOT EXISTS ct_observations_candidate ON ct_observations (candidate);
 
+  -- Wallets under investigation, with a name so a shortlist can be built up over weeks
+  -- rather than retyping an address each time.
+  CREATE TABLE IF NOT EXISTS ct_followers (
+    follower    TEXT PRIMARY KEY,
+    label       TEXT,
+    created_at  INTEGER NOT NULL,
+    last_traced INTEGER
+  );
+
   -- The followed wallet's own buy list. Walking its history is the single biggest cost in a
   -- trace — six pages regardless of how many tokens were entered — and past trades never
   -- change, so only the recent tail is worth refetching.
@@ -165,14 +174,53 @@ export const store = {
     return { events, observations };
   },
 
-  /** Wallets this follower has been traced against before, for the recent-traces list. */
-  recentFollowers(limit = 10) {
+  /** Records or renames a wallet under investigation. A blank label clears the name. */
+  saveFollower(follower: string, label: string | null) {
+    db.prepare(
+      `INSERT INTO ct_followers (follower, label, created_at, last_traced)
+       VALUES (?, ?, ?, ?)
+       ON CONFLICT (follower) DO UPDATE SET
+         label = COALESCE(excluded.label, ct_followers.label)`,
+    ).run(follower, label && label.trim() ? label.trim().slice(0, 60) : null, Date.now(), null);
+  },
+
+  markTraced(follower: string) {
+    db.prepare(
+      `INSERT INTO ct_followers (follower, label, created_at, last_traced) VALUES (?, NULL, ?, ?)
+       ON CONFLICT (follower) DO UPDATE SET last_traced = excluded.last_traced`,
+    ).run(follower, Date.now(), Date.now());
+  },
+
+  /**
+   * Everything under investigation, with how much evidence has accumulated against each.
+   * Drives the dropdown, so it carries enough detail to choose from without a trace.
+   */
+  listFollowers() {
     return db
       .prepare(
-        `SELECT follower, COUNT(*) AS events, MAX(created_at) AS last_run
-           FROM ct_events GROUP BY follower ORDER BY last_run DESC LIMIT ?`,
+        `SELECT f.follower,
+                f.label,
+                f.last_traced,
+                (SELECT COUNT(*) FROM ct_events e WHERE e.follower = f.follower) AS events,
+                (SELECT COUNT(DISTINCT e.mint) FROM ct_events e WHERE e.follower = f.follower) AS tokens,
+                (SELECT COUNT(*) FROM (
+                   SELECT o.candidate
+                     FROM ct_observations o JOIN ct_events e ON e.id = o.event_id
+                    WHERE e.follower = f.follower
+                    GROUP BY o.candidate
+                   HAVING COUNT(DISTINCT e.mint) >= 2
+                )) AS repeat_candidates
+           FROM ct_followers f
+          ORDER BY COALESCE(f.last_traced, 0) DESC`,
       )
-      .all(limit) as Array<{ follower: string; events: number; last_run: number }>;
+      .all() as Array<{
+      follower: string;
+      label: string | null;
+      last_traced: number | null;
+      events: number;
+      tokens: number;
+      repeat_candidates: number;
+    }>;
   },
 
   forgetFollower(follower: string) {
@@ -184,6 +232,7 @@ export const store = {
     db.transaction(() => {
       db.prepare(`DELETE FROM ct_observations WHERE event_id IN (${list})`).run(...ids);
       db.prepare('DELETE FROM ct_events WHERE follower = ?').run(follower);
+      db.prepare('DELETE FROM ct_follower_buys WHERE follower = ?').run(follower);
     })();
     return ids.length;
   },

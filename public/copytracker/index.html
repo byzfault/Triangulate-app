@@ -25,11 +25,22 @@
   </div>
   <div class="card-body">
     <form id="form" novalidate>
-      <label class="field-label" for="follower">Wallet to trace</label>
+      <label class="field-label" for="savedPick">Wallet to trace</label>
+      <div class="row saved-row">
+        <select id="savedPick" class="saved-pick">
+          <option value="">New wallet…</option>
+        </select>
+      </div>
       <div class="row">
         <input type="text" id="follower" class="addr" placeholder="The wallet you follow" spellcheck="false" autocomplete="off">
       </div>
-      <p class="field-note">The public wallet you suspect is copying someone else.</p>
+      <div class="row">
+        <input type="text" id="followerLabel" class="addr" placeholder="Name it, e.g. “Whale #1” (optional)" maxlength="60" autocomplete="off">
+      </div>
+      <p class="field-note" id="followerNote">
+        The public wallet you suspect is copying someone else. Name it and every trace you run
+        adds to the same case file.
+      </p>
 
       <label class="field-label">Tokens it bought</label>
       <div id="rows"></div>

@@ -115,3 +115,17 @@ tr.cand-divider td{
 }
 tr.is-belowbar{opacity:0.62;}
 tr.is-belowbar .badge{background:#a6b3bc;}
+
+/* Saved-wallet picker. */
+.saved-row{margin-bottom:8px;}
+.saved-pick{
+  width:100%;
+  font-family:inherit;
+  font-size:13px;
+  color:var(--label);
+  padding:8px 10px;
+  border:1px solid var(--border);
+  border-radius:4px;
+  background:#fff;
+}
+.saved-pick:focus{outline:none;border-color:var(--teal);}

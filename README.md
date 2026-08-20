@@ -77,12 +77,28 @@ neutral half — the same rule Triangulate uses, for the same reason: a guessed 
 everything toward the middle and hides the real signal. Timing regularity needs three
 observations before it means anything, and says so until it has them.
 
+### A wallet usually copies several sources
+
+Lead frequency is therefore scored on the **absolute number of leads, not the share of all
+buys**. If a follower copies three wallets, each source only accounts for a slice of its
+trades — scoring share-of-total would give all three 0.33 and bury them under a single lucky
+coincidence. Tested against a synthetic follower copying three sources across twelve buys,
+all three surface together at 6.4 while a bot leading *all twelve* is gated down to 4.0.
+
+Name a wallet and pick it from the dropdown to keep adding to the same case file. Each trace
+appends to what is already on record rather than replacing it, and the dropdown shows how many
+buys and repeat candidates have accumulated against each wallet.
+
 ### It gets stronger over time
 
 Every buy ever analysed stays on record, and the score is computed over **all** of it, not
 just today's search. Run it again next week with two new coins and the same candidates either
 keep leading or they don't. That accumulation is the point — one wallet buying ahead of
 another once is a coincidence, and no amount of scoring fixes a single data point.
+
+Measured on a real wallet: three tokens produced **46 candidates and zero repeats**. Adding
+three more tokens to the same case file produced **five wallets leading on 2+ tokens**, and
+cost 7 requests because the first three windows came from cache.
 
 ### Honest limits
 

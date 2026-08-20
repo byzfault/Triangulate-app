@@ -17,12 +17,23 @@ export function registerCopyTracker(app: FastifyInstance) {
   app.get('/api/copy/config', async () => ({
     defaults: traceDefaults,
     bands: confidenceConfig.bands,
-    recent: store.recentFollowers(),
+    followers: store.listFollowers(),
     logger: loggerStatus(),
   }));
 
+  /** The wallets under investigation, for the dropdown. */
+  app.get('/api/copy/followers', async () => ({ followers: store.listFollowers() }));
+
+  /** Name or rename a wallet, so a long-running investigation is recognisable. */
+  app.post<{ Body: { follower?: string; label?: string } }>('/api/copy/followers', async (req, reply) => {
+    const follower = typeof req.body?.follower === 'string' ? req.body.follower.trim() : '';
+    if (!BASE58.test(follower)) return reply.code(400).send({ error: 'Not a valid wallet address.' });
+    store.saveFollower(follower, typeof req.body?.label === 'string' ? req.body.label : null);
+    return { followers: store.listFollowers() };
+  });
+
   app.post<{
-    Body: { follower?: string; mints?: unknown; options?: Partial<TraceOptions> };
+    Body: { follower?: string; mints?: unknown; options?: Partial<TraceOptions>; label?: string };
   }>('/api/copy/trace', async (req, reply) => {
     const follower = typeof req.body?.follower === 'string' ? req.body.follower.trim() : '';
     if (!BASE58.test(follower)) {
@@ -60,6 +71,11 @@ export function registerCopyTracker(app: FastifyInstance) {
     options.windowSecs = clampNum(options.windowSecs, 2, 600, traceDefaults.windowSecs);
     options.minHits = clampNum(options.minHits, 1, 50, traceDefaults.minHits);
     options.minTokens = clampNum(options.minTokens, 1, 8, traceDefaults.minTokens);
+
+    // Recorded before the trace runs, so the wallet appears in the dropdown even if the
+    // trace then fails — the investigation exists from the moment it is started.
+    store.saveFollower(follower, typeof req.body?.label === 'string' ? req.body.label : null);
+    store.markTraced(follower);
 
     const id = randomUUID();
     const job = jobs.create(id);
