@@ -4,7 +4,7 @@ import { ApiError, BudgetExceededError, QuotaExhaustedError, RequestBudget } fro
 import { config } from '../../shared/config.js';
 import { JobRegistry } from '../../shared/jobs.js';
 import { runTrace, traceDefaults, type TraceOptions } from './trace.js';
-import { confidenceConfig } from './confidence.js';
+import { confidenceConfig, rankCandidates } from './confidence.js';
 import { loggerStatus, startLogger, stopLogger, trackToken } from './logger.js';
 import { store } from './store.js';
 import type { TraceProgress } from './types.js';
@@ -20,6 +20,36 @@ export function registerCopyTracker(app: FastifyInstance) {
     followers: store.listFollowers(),
     logger: loggerStatus(),
   }));
+
+  /**
+   * The sources already established for a wallet, recomputed from the stored log with no
+   * API calls at all. Selecting a saved wallet shows its shortlist immediately, rather than
+   * making you re-run a trace to see what you already know.
+   */
+  app.get<{ Params: { follower: string }; Querystring: { minHits?: string; minTokens?: string; excludeBots?: string } }>(
+    '/api/copy/candidates/:follower',
+    async (req, reply) => {
+      const follower = req.params.follower.trim();
+      if (!BASE58.test(follower)) return reply.code(400).send({ error: 'Not a valid wallet address.' });
+
+      const history = store.history(follower);
+      const ranked = rankCandidates(history.observations, history.events, {
+        minHits: clampNum(req.query.minHits, 1, 50, traceDefaults.minHits),
+        minTokens: clampNum(req.query.minTokens, 1, 8, traceDefaults.minTokens),
+        excludeBots: req.query.excludeBots !== 'false',
+      });
+
+      return {
+        follower,
+        label: store.listFollowers().find((f) => f.follower === follower)?.label ?? null,
+        candidates: ranked.candidates,
+        considered: ranked.considered,
+        botsExcluded: ranked.botsExcluded,
+        events: history.events.length,
+        tokens: new Set(history.events.map((e) => e.mint)).size,
+      };
+    },
+  );
 
   /** The wallets under investigation, for the dropdown. */
   app.get('/api/copy/followers', async () => ({ followers: store.listFollowers() }));
@@ -71,6 +101,7 @@ export function registerCopyTracker(app: FastifyInstance) {
     options.windowSecs = clampNum(options.windowSecs, 2, 600, traceDefaults.windowSecs);
     options.minHits = clampNum(options.minHits, 1, 50, traceDefaults.minHits);
     options.minTokens = clampNum(options.minTokens, 1, 8, traceDefaults.minTokens);
+    options.excludeBots = req.body?.options?.excludeBots !== false;
 
     // Recorded before the trace runs, so the wallet appears in the dropdown even if the
     // trace then fails — the investigation exists from the moment it is started.

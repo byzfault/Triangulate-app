@@ -86,8 +86,17 @@ coincidence. Tested against a synthetic follower copying three sources across tw
 all three surface together at 6.4 while a bot leading *all twelve* is gated down to 4.0.
 
 Name a wallet and pick it from the dropdown to keep adding to the same case file. Each trace
-appends to what is already on record rather than replacing it, and the dropdown shows how many
-buys and repeat candidates have accumulated against each wallet.
+appends to what is already on record rather than replacing it, and selecting a saved wallet
+shows its established sources **immediately, with no API calls** — the shortlist is recomputed
+from the stored log, so you never re-run a trace just to see what you already know. Changing
+the thresholds re-filters that table live.
+
+**High-frequency bots are removed, not just demoted.** Nobody copies an MEV bot or a market
+maker, and the base-rate gate only flattens their score — they still cluttered the shortlist.
+Two free signals drop them outright: a wallet taking several bites inside one window is running
+a script, and one accounting for more than 10% of all buying is providing liquidity, not alpha.
+The filter abstains until there are at least three events to judge from, and can be switched
+off in Settings.
 
 ### It gets stronger over time
 

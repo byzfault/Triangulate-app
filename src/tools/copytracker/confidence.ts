@@ -12,6 +12,27 @@ export const confidenceConfig = {
     possible: 4, // >= possible → amber, below → red
   },
 
+  /**
+   * High-frequency bots are removed outright rather than merely scored down.
+   *
+   * Nobody copies an MEV bot or a market maker. Those wallets buy constantly, so they sit in
+   * front of everyone's trades and clutter the shortlist even after the base-rate gate has
+   * flattened their score. The signals are free — both come from the windows already scanned:
+   * a wallet taking several bites inside a single 60-second window is running a script, and
+   * one accounting for a large share of all buying is providing liquidity, not alpha.
+   *
+   * Judgement is withheld until there are a few windows to judge from, since one busy window
+   * says nothing.
+   */
+  botExclusion: {
+    /** Share of all buys across scanned windows above which a wallet is market infrastructure. */
+    maxActivityShare: 0.1,
+    /** Average buys per window it appears in. Above this it is averaging in, not entering. */
+    maxAvgBuysPerWindow: 3,
+    /** Below this many events on record, the filter abstains rather than guesses. */
+    minEventsForJudgement: 3,
+  },
+
   /** A wallet seen leading fewer times than this is a coincidence, not a candidate. */
   minHits: 2,
   /** Leading on one token proves nothing; the pattern has to repeat across coins. */
@@ -132,14 +153,15 @@ function formatLead(ms: number): string {
 export function rankCandidates(
   observations: ObservationRow[],
   events: Array<{ id: number; mint: string; symbol: string | null; buy_ts: number; scanned_buys: number }>,
-  opts: { minHits?: number; minTokens?: number } = {},
-): { candidates: Candidate[]; considered: number } {
+  opts: { minHits?: number; minTokens?: number; excludeBots?: boolean } = {},
+): { candidates: Candidate[]; considered: number; botsExcluded: number } {
   const cfg = confidenceConfig;
   const minHits = opts.minHits ?? cfg.minHits;
   const minTokens = opts.minTokens ?? cfg.minTokens;
+  const excludeBots = opts.excludeBots ?? true;
 
   const totalEvents = events.length;
-  if (totalEvents === 0) return { candidates: [], considered: 0 };
+  if (totalEvents === 0) return { candidates: [], considered: 0, botsExcluded: 0 };
 
   const totalScannedBuys = events.reduce((a, e) => a + e.scanned_buys, 0);
   const avgWindowBuys = totalScannedBuys / totalEvents;
@@ -152,6 +174,7 @@ export function rankCandidates(
   }
 
   const candidates: Candidate[] = [];
+  let botsExcluded = 0;
 
   for (const [wallet, rows] of grouped) {
     const hits = new Set(rows.map((r) => r.event_id)).size;
@@ -183,6 +206,19 @@ export function rankCandidates(
     // how many windows it would have turned up in purely by being busy.
     const candidateBuys = rows.reduce((a, r) => a + r.buys_in_window, 0);
     const activityShare = totalScannedBuys > 0 ? candidateBuys / totalScannedBuys : 0;
+    const avgBuysPerWindow = candidateBuys / rows.length;
+
+    // Bots are dropped, not demoted — a shortlist of suspects should not be padded with
+    // wallets nobody would copy.
+    if (
+      excludeBots &&
+      totalEvents >= cfg.botExclusion.minEventsForJudgement &&
+      (activityShare > cfg.botExclusion.maxActivityShare ||
+        avgBuysPerWindow > cfg.botExclusion.maxAvgBuysPerWindow)
+    ) {
+      botsExcluded += 1;
+      continue;
+    }
     const chancePerWindow = 1 - Math.pow(1 - Math.min(activityShare, 0.999), Math.max(avgWindowBuys, 1));
     const expected = totalEvents * chancePerWindow;
     const lift = expected > 0.0001 ? hits / expected : null;
@@ -293,7 +329,7 @@ export function rankCandidates(
   const qualifying = candidates.filter((c) => c.meetsBar);
   const nearMisses = candidates.filter((c) => !c.meetsBar).slice(0, NEAR_MISS_LIMIT);
 
-  return { candidates: [...qualifying, ...nearMisses], considered: grouped.size };
+  return { candidates: [...qualifying, ...nearMisses], considered: grouped.size, botsExcluded };
 }
 
 function plausibility(medianMs: number, cfg: typeof confidenceConfig): number {

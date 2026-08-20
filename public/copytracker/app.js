@@ -16,12 +16,14 @@
   const progressList = document.getElementById('progressList');
   const counterEl = document.getElementById('counter');
 
+  const candTitle = document.getElementById('candTitle');
   const candStatus = document.getElementById('candStatus');
   const candScroll = document.getElementById('candScroll');
   const candBody = document.getElementById('candBody');
   const candFoot = document.getElementById('candFoot');
 
   const resultsEl = document.getElementById('results');
+  const resultsTitleEl = document.getElementById('resultsTitle');
   const resultsSub = document.getElementById('resultsSub');
   const theadEl = document.getElementById('thead');
   const tbodyEl = document.getElementById('tbody');
@@ -129,7 +131,63 @@
     markValidity(followerEl, followerEl.value);
     describeFollower(f);
     updateSubmit();
+    if (f) loadStoredCandidates(f.follower);
+    else {
+      candScroll.hidden = true;
+      candStatus.hidden = false;
+      candStatus.className = 'panel-status';
+      candStatus.textContent = 'Run a trace to see who this wallet buys behind.';
+      candTitle.textContent = 'Suspected sources';
+      candFoot.textContent = '';
+    }
   });
+
+  /** The wallet's given name where it has one, so the UI talks about "Whale #1", not an address. */
+  function nameFor(addr) {
+    const f = followers.find((x) => x.follower === addr);
+    return (f && f.label) || (labelEl.value.trim() || shortAddr(addr));
+  }
+
+  /**
+   * Pulls the sources already established for a wallet straight from the stored log. No API
+   * calls, so selecting a saved wallet shows what is known immediately instead of making you
+   * re-run a trace to see it.
+   */
+  async function loadStoredCandidates(addr) {
+    if (!BASE58.test(addr)) return;
+    candStatus.hidden = false;
+    candStatus.className = 'panel-status working';
+    candStatus.textContent = 'Loading what is already on record…';
+    try {
+      const qs = new URLSearchParams({
+        minHits: String(numOf('minHits', 2)),
+        minTokens: String(numOf('minTokens', 2)),
+        excludeBots: String(document.getElementById('excludeBots').checked),
+      });
+      const res = await fetch('/api/copy/candidates/' + addr + '?' + qs);
+      const d = await res.json();
+      if (!res.ok) throw new Error(d.error || 'could not load');
+
+      if (d.events === 0) {
+        candScroll.hidden = true;
+        candStatus.className = 'panel-status';
+        candStatus.textContent = 'Nothing on record for this wallet yet. Run a trace to start the case file.';
+        candFoot.textContent = '';
+        candTitle.textContent = 'Suspected sources';
+        return;
+      }
+
+      candTitle.textContent = 'Suspected sources · ' + (d.label || shortAddr(addr));
+      renderCandidateRows(d.candidates);
+      candFoot.textContent =
+        `From ${d.events} buy${d.events === 1 ? '' : 's'} across ${d.tokens} token` +
+        `${d.tokens === 1 ? '' : 's'} on record · ${d.considered} wallets seen` +
+        (d.botsExcluded ? ` · ${d.botsExcluded} bots filtered out` : '');
+    } catch {
+      candStatus.className = 'panel-status';
+      candStatus.textContent = 'Could not load stored sources.';
+    }
+  }
 
   /** Says what is already on record, so it is obvious a trace is adding to a case file. */
   function describeFollower(f) {
@@ -170,6 +228,14 @@
         )
         .join('');
     if (chosen) savedPick.value = chosen;
+  }
+
+  // Changing the bar re-filters what is already on record, without a new trace or a request.
+  for (const id of ['minHits', 'minTokens', 'excludeBots']) {
+    document.getElementById(id).addEventListener('change', () => {
+      const addr = followerEl.value.trim();
+      if (BASE58.test(addr)) loadStoredCandidates(addr);
+    });
   }
 
   addBtn.addEventListener('click', () => {
@@ -239,6 +305,7 @@
             firstBuyOnly: document.getElementById('firstBuyOnly').checked,
             minHits: numOf('minHits', 2),
             minTokens: numOf('minTokens', 2),
+            excludeBots: document.getElementById('excludeBots').checked,
           },
         }),
       });
@@ -304,7 +371,21 @@
   // ---- candidates -------------------------------------------------------------------------
 
   function renderCandidates(result) {
-    const list = result.candidates;
+    candTitle.textContent = 'Suspected sources · ' + nameFor(result.follower);
+    renderCandidateRows(result.candidates);
+
+    const qualifying = result.candidates.filter((c) => c.meetsBar);
+    const strong = qualifying.filter((c) => c.band === 'strong').length;
+    candFoot.textContent =
+      `${result.stats.candidatesConsidered} wallet` +
+      `${result.stats.candidatesConsidered === 1 ? '' : 's'} bought just before, over ` +
+      `${result.stats.eventsAllTime} buy${result.stats.eventsAllTime === 1 ? '' : 's'} on record · ` +
+      `${qualifying.length} met the bar` +
+      (strong > 0 ? `, ${strong} scoring 7+` : '') +
+      (result.stats.botsExcluded ? ` · ${result.stats.botsExcluded} bots filtered out` : '');
+  }
+
+  function renderCandidateRows(list) {
     candBody.innerHTML = '';
     expanded = null;
 
@@ -314,7 +395,6 @@
       candStatus.className = 'panel-status';
       candStatus.textContent =
         'Nobody bought in the window before any of these buys. Try a wider lookback window.';
-      candFoot.textContent = '';
       return;
     }
 
@@ -366,14 +446,6 @@
       candBody.appendChild(tr);
     }
 
-    const qualifying = list.filter((c) => c.meetsBar);
-    const strong = qualifying.filter((c) => c.band === 'strong').length;
-    candFoot.textContent =
-      `${result.stats.candidatesConsidered} wallet` +
-      `${result.stats.candidatesConsidered === 1 ? '' : 's'} bought just before, over ` +
-      `${result.stats.eventsAllTime} buy${result.stats.eventsAllTime === 1 ? '' : 's'} on record · ` +
-      `${qualifying.length} met the bar` +
-      (strong > 0 ? `, ${strong} scoring 7+` : '');
   }
 
   function toggleBreakdown(tr, c) {
@@ -438,6 +510,7 @@
     resultsEl.hidden = false;
     const ev = result.events;
 
+    resultsTitleEl.textContent = 'Buys analysed · ' + nameFor(result.follower);
     resultsSub.textContent =
       `${result.stats.eventsThisRun} buy${result.stats.eventsThisRun === 1 ? '' : 's'} analysed this run · ` +
       `${result.stats.freeWindows} free · ${result.stats.cachedWindows} already on record · ` +
@@ -493,7 +566,8 @@
     const blob = new Blob([lines.join('\n')], { type: 'text/csv' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = 'copy-sources-' + lastResult.follower.slice(0, 8) + '.csv';
+    a.download =
+      'copy-sources-' + nameFor(lastResult.follower).replace(/[^a-z0-9]+/gi, '-').toLowerCase() + '.csv';
     a.click();
     URL.revokeObjectURL(a.href);
   });

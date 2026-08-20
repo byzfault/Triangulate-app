@@ -80,6 +80,7 @@ export interface TraceResult {
     eventsThisRun: number;
     eventsAllTime: number;
     candidatesConsidered: number;
+    botsExcluded: number;
     elapsedMs: number;
   };
 }

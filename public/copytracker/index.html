@@ -75,6 +75,12 @@
               <input type="number" id="minTokens" value="2" min="1" max="8" class="num"> different tokens
               <em>this is the elimination step — noise rarely repeats across coins</em></span>
           </label>
+          <label class="check">
+            <input type="checkbox" id="excludeBots" checked>
+            <span>Exclude high-frequency bots
+              <em>MEV bots and market makers buy constantly, so they sit in front of everyone's
+              trades. Nobody copies them, so they are removed rather than just scored down.</em></span>
+          </label>
           <p class="filters-foot">Every buy analysed is kept on record. Run this again next week
             with new tokens and the same wallet's confidence sharpens, because the score is
             computed over everything ever seen — not just today's search.</p>
@@ -102,7 +108,7 @@
 
 <aside class="card panel panel-candidates" id="candidatePanel">
   <div class="card-header">
-    <h1>Suspected sources</h1>
+    <h1 id="candTitle">Suspected sources</h1>
   </div>
   <div class="panel-body">
     <p class="panel-status" id="candStatus">Run a trace to see who this wallet buys behind.</p>

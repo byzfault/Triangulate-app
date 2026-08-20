@@ -38,6 +38,8 @@ export interface TraceOptions {
   minHits: number;
   /** Minimum distinct tokens a candidate must lead on. */
   minTokens: number;
+  /** Drop high-frequency bots and market makers from the shortlist. */
+  excludeBots: boolean;
 }
 
 export const traceDefaults: TraceOptions = {
@@ -54,6 +56,8 @@ export const traceDefaults: TraceOptions = {
   firstBuyOnly: true,
   minHits: 2,
   minTokens: 2,
+  /** Nobody copies an MEV bot, so they are removed rather than left cluttering the list. */
+  excludeBots: true,
 };
 
 type Emit = (e: TraceProgress) => void;
@@ -84,6 +88,7 @@ export async function runTrace(
   let paidWindows = 0;
   let cachedWindows = 0;
   let considered = 0;
+  let botsExcluded = 0;
 
   // ---- Phase 1: the follower's own buys ------------------------------------------------
   emit({ type: 'phase', phase: 'history', detail: 'Reading the followed wallet’s trade history' });
@@ -196,9 +201,11 @@ export async function runTrace(
   const ranked = rankCandidates(history.observations, history.events, {
     minHits: opts.minHits,
     minTokens: opts.minTokens,
+    excludeBots: opts.excludeBots,
   });
   const candidates = ranked.candidates;
   considered = ranked.considered;
+  botsExcluded = ranked.botsExcluded;
   const eventsAllTime = history.events.length;
 
   if (eventsAllTime > events.length) {
@@ -207,6 +214,14 @@ export async function runTrace(
       `Scored against ${eventsAllTime} buys on record for this wallet, including ${
         eventsAllTime - events.length
       } from earlier traces. Confidence strengthens as you add more tokens over time.`,
+    );
+  }
+
+  if (ranked.botsExcluded > 0) {
+    warn(
+      'notice',
+      `${ranked.botsExcluded} high-frequency wallet${ranked.botsExcluded === 1 ? '' : 's'} removed as bots or ` +
+        `market makers — they buy constantly, so they sit in front of everyone's trades and nobody copies them.`,
     );
   }
 
@@ -239,6 +254,7 @@ export async function runTrace(
         eventsThisRun: evs.length,
         eventsAllTime: allTime ?? evs.length,
         candidatesConsidered: considered,
+        botsExcluded,
         elapsedMs: Date.now() - startedAt,
       },
     };
