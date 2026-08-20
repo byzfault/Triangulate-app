@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 430 120" width="430" height="120">
+  <!-- Mark -->
+  <g>
+    <path d="M60 20 L102 92 L18 92 Z" fill="none" stroke="#cfd9de" stroke-width="4" stroke-linejoin="round"/>
+    <g stroke="#4dc0b5" stroke-width="2.5" stroke-dasharray="1 6" stroke-linecap="round">
+      <line x1="60" y1="20" x2="60" y2="68"/>
+      <line x1="102" y1="92" x2="60" y2="68"/>
+      <line x1="18" y1="92" x2="60" y2="68"/>
+    </g>
+    <circle cx="60" cy="20" r="8.5" fill="#47555f"/>
+    <circle cx="102" cy="92" r="8.5" fill="#47555f"/>
+    <circle cx="18" cy="92" r="8.5" fill="#47555f"/>
+    <circle cx="60" cy="68" r="12" fill="#4dc0b5"/>
+    <circle cx="60" cy="68" r="5" fill="#ffffff"/>
+  </g>
+  <!-- Wordmark -->
+  <text x="130" y="72" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Open Sans', Helvetica, Arial, sans-serif"
+        font-size="42" font-weight="600" fill="#47555f" letter-spacing="0.5">Triangul<tspan fill="#4dc0b5">ate</tspan></text>
+</svg>

@@ -514,3 +514,27 @@ body{
 }
 .quick-fill{display:flex;gap:8px;flex-wrap:wrap;}
 .quick-fill .btn-add{margin-bottom:18px;}
+
+/* --- Brand header ------------------------------------------------------------------- */
+.brand{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:6px;
+  margin-bottom:-4px;
+}
+/* The SVG carries its own 430x120 viewBox; height drives the rendered size. */
+.brand-mark{
+  height:52px;
+  width:auto;
+  display:block;
+}
+.brand-tag{
+  font-size:13px;
+  color:var(--muted);
+  letter-spacing:0.2px;
+}
+@media (max-width:520px){
+  .brand-mark{height:40px;}
+  .brand-tag{font-size:12px;text-align:center;}
+}
