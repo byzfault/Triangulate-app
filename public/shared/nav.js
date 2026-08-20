@@ -32,7 +32,9 @@ function buildNav(host) {
     <button class="nav-burger" id="navBurger" aria-label="Open menu" aria-expanded="false" aria-controls="navMenu">
       <span></span><span></span><span></span>
     </button>
-    <a class="nav-suite" href="/triangulate/">Solana Toolkit</a>
+    <a class="nav-suite" href="/triangulate/" aria-label="Triangulate">
+      <img class="nav-logo" src="/shared/triangulate-logo-wordmark.svg" alt="Triangulate" width="430" height="120">
+    </a>
     <nav class="nav-menu" id="navMenu" hidden>
       <p class="nav-heading">Tools</p>
       ${TOOLS.map(
