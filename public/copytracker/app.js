@@ -252,7 +252,7 @@
       candStatus.hidden = false;
       candStatus.className = 'panel-status';
       candStatus.textContent =
-        'No wallet met the bar. Add more tokens this wallet bought — the pattern only separates from noise across several coins.';
+        'Nobody bought in the window before any of these buys. Try a wider lookback window.';
       candFoot.textContent = '';
       return;
     }
@@ -260,8 +260,21 @@
     candStatus.hidden = true;
     candScroll.hidden = false;
 
+    let dividerDrawn = false;
     for (const c of list) {
+      // Everything below the bar goes under a labelled divider, so a near-miss is never
+      // mistaken for a conclusion.
+      if (!c.meetsBar && !dividerDrawn) {
+        dividerDrawn = true;
+        const sep = document.createElement('tr');
+        sep.className = 'cand-divider';
+        sep.innerHTML =
+          '<td colspan="4">Below the evidence bar — led only once, or on a single token. ' +
+          'Shown for reference, not as findings.</td>';
+        candBody.appendChild(sep);
+      }
       const tr = document.createElement('tr');
+      if (!c.meetsBar) tr.className = 'is-belowbar';
       tr.innerHTML =
         '<td>' +
         '<a class="cand-wallet" href="https://solscan.io/account/' +
@@ -292,11 +305,14 @@
       candBody.appendChild(tr);
     }
 
-    const strong = list.filter((c) => c.band === 'strong').length;
+    const qualifying = list.filter((c) => c.meetsBar);
+    const strong = qualifying.filter((c) => c.band === 'strong').length;
     candFoot.textContent =
-      `${list.length} candidate${list.length === 1 ? '' : 's'} over ${result.stats.eventsAllTime} buy` +
-      `${result.stats.eventsAllTime === 1 ? '' : 's'} on record` +
-      (strong > 0 ? ` · ${strong} scoring 7+` : '');
+      `${result.stats.candidatesConsidered} wallet` +
+      `${result.stats.candidatesConsidered === 1 ? '' : 's'} bought just before, over ` +
+      `${result.stats.eventsAllTime} buy${result.stats.eventsAllTime === 1 ? '' : 's'} on record · ` +
+      `${qualifying.length} met the bar` +
+      (strong > 0 ? `, ${strong} scoring 7+` : '');
   }
 
   function toggleBreakdown(tr, c) {

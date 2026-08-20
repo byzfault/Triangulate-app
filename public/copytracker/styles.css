@@ -103,3 +103,15 @@ tr.cand-breakdown td{background:#fbfcfd;padding:0;}
 @media (max-width:900px){
   .panel-candidates{flex:1 1 100%;}
 }
+
+/* Near-misses: present, but visibly not findings. */
+tr.cand-divider td{
+  padding:9px 10px 6px;
+  font-size:10.5px;
+  color:var(--muted);
+  background:#fbfcfd;
+  border-bottom:1px solid var(--border-soft);
+  line-height:1.4;
+}
+tr.is-belowbar{opacity:0.62;}
+tr.is-belowbar .badge{background:#a6b3bc;}

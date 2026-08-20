@@ -83,6 +83,9 @@ export const confidenceConfig = {
   },
 } as const;
 
+/** How many below-the-bar wallets to show, so the shortlist stays short. */
+const NEAR_MISS_LIMIT = 12;
+
 const clamp01 = (n: number) => Math.min(1, Math.max(0, n));
 
 /** Linear interpolation between two points, clamped at both ends. */
@@ -149,7 +152,11 @@ export function rankCandidates(
     }
     const tokens = tokenMap.size;
 
-    if (hits < minHits || tokens < minTokens) continue;
+    // Candidates below the bar are kept and flagged rather than dropped. Showing nothing at
+    // all reads as "the tool found nothing", when what actually happened is that plenty of
+    // wallets bought just before — none of them twice. That distinction is the whole result,
+    // so the near-misses are shown greyed out beneath the ones that qualify.
+    const meetsBar = hits >= minHits && tokens >= minTokens;
 
     const leads = rows.map((r) => r.lead_ms);
     const med = median(leads);
@@ -253,14 +260,28 @@ export function rankCandidates(
       components,
       coverage: Math.round(measuredWeight * 100),
       gate: Math.round(gate * 100) / 100,
+      meetsBar,
       perToken: [...tokenMap.entries()].map(([mint, v]) => ({ mint, symbol: v.symbol, leadMs: v.leadMs })),
       firstSeen: Math.min(...rows.map((r) => r.buy_ts)),
       lastSeen: Math.max(...rows.map((r) => r.buy_ts)),
     });
   }
 
-  candidates.sort((a, b) => b.score - a.score || b.hits - a.hits);
-  return { candidates, considered: grouped.size };
+  // Qualifying candidates first, then the near-misses by strength of what evidence exists.
+  candidates.sort(
+    (a, b) =>
+      Number(b.meetsBar) - Number(a.meetsBar) ||
+      b.score - a.score ||
+      b.hits - a.hits ||
+      a.medianLeadMs - b.medianLeadMs,
+  );
+
+  // A trace on a busy token can put hundreds of wallets in the windows. Everything that met
+  // the bar is kept; below it, only enough to show what was considered.
+  const qualifying = candidates.filter((c) => c.meetsBar);
+  const nearMisses = candidates.filter((c) => !c.meetsBar).slice(0, NEAR_MISS_LIMIT);
+
+  return { candidates: [...qualifying, ...nearMisses], considered: grouped.size };
 }
 
 function plausibility(medianMs: number, cfg: typeof confidenceConfig): number {

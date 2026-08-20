@@ -210,11 +210,14 @@ export async function runTrace(
     );
   }
 
-  if (candidates.length === 0 && considered > 0) {
+  const qualifying = candidates.filter((c) => c.meetsBar).length;
+  if (qualifying === 0 && considered > 0) {
     warn(
       'notice',
-      `${considered} wallets appeared in the windows but none met the bar of ${opts.minHits}+ leads across ${opts.minTokens}+ tokens. ` +
-        `Add more tokens this wallet has bought — the pattern only separates from noise across several coins.`,
+      `${considered} wallets bought just before these buys, but not one of them did it twice — ` +
+        `so there is no repeating pattern here yet, only single coincidences. The strongest are ` +
+        `listed below the bar for reference. Add more tokens this wallet bought, or widen the ` +
+        `lookback window, and any real source will start repeating.`,
     );
   }
 

@@ -58,6 +58,8 @@ export interface Candidate {
   coverage: number;
   /** Base-rate multiplier applied to the score. 1 = no discount, 0.2 = fully discounted. */
   gate: number;
+  /** Whether it cleared the minimum leads and token-repeat thresholds. */
+  meetsBar: boolean;
   perToken: Array<{ mint: string; symbol: string; leadMs: number }>;
   firstSeen: number;
   lastSeen: number;
