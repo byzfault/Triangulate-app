@@ -129,3 +129,7 @@ tr.is-belowbar .badge{background:#a6b3bc;}
   background:#fff;
 }
 .saved-pick:focus{outline:none;border-color:var(--teal);}
+
+/* Wallet-wide trade rate, the tell that separates a person from a scheduler. */
+.rate-tag{color:var(--muted);}
+.rate-tag.is-bot{color:var(--neg);font-weight:600;}

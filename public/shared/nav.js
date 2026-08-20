@@ -76,6 +76,11 @@ async function refreshUsage(host) {
     const res = await fetch('/api/usage');
     if (!res.ok) throw new Error();
     const u = await res.json();
+    if (u.exhausted) {
+      el.textContent = 'Solana Tracker: no credits left';
+      el.className = 'nav-foot is-hot';
+      return;
+    }
     const pct = Math.round(u.quota.percent);
     el.textContent = `${u.quota.used.toLocaleString()} / ${u.quota.limit.toLocaleString()} monthly requests used (${pct}%)`;
     el.className = 'nav-foot' + (pct >= 90 ? ' is-hot' : pct >= 70 ? ' is-warm' : '');

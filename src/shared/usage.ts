@@ -27,6 +27,44 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS api_usage_provider_ts ON api_usage (provider, ts);
 `);
 
+db.exec(`
+  CREATE TABLE IF NOT EXISTS provider_state (
+    provider     TEXT PRIMARY KEY,
+    exhausted_at INTEGER,
+    message      TEXT
+  );
+`);
+
+/**
+ * The provider's own verdict, which outranks our count.
+ *
+ * Our meter only knows about requests made since it was installed, so on an account with
+ * prior usage it reports a comfortable balance that does not exist. When Solana Tracker says
+ * it is out of credits, that is recorded and shown instead — a wrong "9,950 remaining" is
+ * worse than no number at all, because it sends you hunting for a bug in the key.
+ */
+export function markExhausted(provider: Provider, message: string) {
+  db.prepare(
+    `INSERT INTO provider_state (provider, exhausted_at, message) VALUES (?, ?, ?)
+     ON CONFLICT (provider) DO UPDATE SET exhausted_at = excluded.exhausted_at, message = excluded.message`,
+  ).run(provider, Date.now(), message.slice(0, 200));
+}
+
+/** Cleared by any successful request, so a topped-up account recovers on its own. */
+export function clearExhausted(provider: Provider) {
+  const row = db.prepare('SELECT exhausted_at FROM provider_state WHERE provider = ?').get(provider) as
+    | { exhausted_at: number | null }
+    | undefined;
+  if (row?.exhausted_at) db.prepare('UPDATE provider_state SET exhausted_at = NULL WHERE provider = ?').run(provider);
+}
+
+export function exhaustedState(provider: Provider = 'solanatracker') {
+  const row = db.prepare('SELECT exhausted_at, message FROM provider_state WHERE provider = ?').get(provider) as
+    | { exhausted_at: number | null; message: string | null }
+    | undefined;
+  return row?.exhausted_at ? { since: row.exhausted_at, message: row.message } : null;
+}
+
 const insert = db.prepare(
   'INSERT INTO api_usage (provider, tier, endpoint, ok, ts) VALUES (?, ?, ?, ?, ?)',
 );
@@ -95,6 +133,10 @@ function generalise(endpoint: string): string {
 }
 
 export interface UsageSummary {
+  /** Set when the provider itself reports no credit left. Overrides the local figures. */
+  exhausted: { since: number; message: string | null } | null;
+  /** Our meter only counts from when it was installed, so it under-reports prior usage. */
+  countingSince: number | null;
   period: { start: number; end: number; resetDay: number };
   quota: { used: number; limit: number; remaining: number; percent: number };
   paid: { used: number; limit: number; remaining: number; enabled: boolean };
@@ -115,7 +157,11 @@ export function summary(): UsageSummary {
   const quotaUsed = usedThisPeriod('solanatracker');
   const paidUsed = paidThisPeriod('solanatracker');
 
+  const first = db.prepare('SELECT MIN(ts) AS n FROM api_usage').get() as { n: number | null };
+
   return {
+    exhausted: exhaustedState('solanatracker'),
+    countingSince: first.n,
     period: { start, end: periodEnd(), resetDay: config.quotaResetDay },
     quota: {
       used: Math.min(quotaUsed, config.freeMonthlyLimit),

@@ -62,9 +62,16 @@
               because the timing gets less consistent.</em></span>
           </label>
           <label class="check">
-            <input type="checkbox" id="firstBuyOnly" checked>
+            <input type="checkbox" id="firstBuyOnly">
             <span>First buy of each token only
-              <em>the entry is the copied decision; later adds happen on the copier's own schedule</em></span>
+              <em>off by default. Every buy is a fresh chance to catch the same source at the
+              same delay, and timing spread needs at least three observations before it means
+              anything — entries alone rarely give enough.</em></span>
+          </label>
+          <label class="check">
+            <span>Analyse at most
+              <input type="number" id="maxEvents" value="40" min="2" max="200" class="num"> buys, most recent first
+              <em>each new buy is one request the first time it is seen, then cached</em></span>
           </label>
           <label class="check">
             <span>Only list wallets that led at least

@@ -16,11 +16,31 @@
     el('freeCount').textContent = u.free.thisPeriod.toLocaleString();
     el('freeAllTime').textContent = `${u.free.allTime.toLocaleString()} since the suite was first run`;
 
+    // --- provider's own verdict outranks our count ---
+    const banner = el('exhaustedBanner');
+    if (u.exhausted) {
+      banner.hidden = false;
+      banner.textContent =
+        'Solana Tracker reports no credits left on this plan, as of ' +
+        new Date(u.exhausted.since).toLocaleString() +
+        '. The figures below only count requests made since this meter was installed' +
+        (u.countingSince ? ' on ' + new Date(u.countingSince).toLocaleDateString() : '') +
+        ', so they under-report anything spent before that. Traces will fail until you top up ' +
+        'or the plan resets. The free trade logger is unaffected and keeps recording.';
+      el('quotaCard').classList.add('is-exhausted');
+    } else {
+      banner.hidden = true;
+      el('quotaCard').classList.remove('is-exhausted');
+    }
+
     // --- quota ---
     el('quotaCount').textContent = u.quota.used.toLocaleString();
     el('quotaSub').textContent = `of ${u.quota.limit.toLocaleString()} · ${u.quota.remaining.toLocaleString()} left`;
     setMeter(el('quotaBar'), u.quota.percent);
-    el('quotaReset').textContent =
+    el('quotaReset').innerHTML =
+      (u.countingSince
+        ? '<em>Counted from ' + new Date(u.countingSince).toLocaleDateString() + ', not from your plan start.</em><br>'
+        : '') +
       `Resets ${new Date(u.period.end).toLocaleDateString(undefined, { day: 'numeric', month: 'long' })}` +
       ` (day ${u.period.resetDay} of the month)`;
 

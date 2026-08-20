@@ -1,5 +1,5 @@
 import { config } from './config.js';
-import { nextTier, record } from './usage.js';
+import { clearExhausted, markExhausted, nextTier, record } from './usage.js';
 
 /**
  * Errors we surface to the UI in plain language rather than as HTTP noise.
@@ -17,10 +17,11 @@ export class ApiError extends Error {
  * means the account itself has nothing left to spend.
  */
 export class QuotaExhaustedError extends Error {
-  constructor() {
+  constructor(detail?: string) {
     super(
-      'The Solana Tracker free allowance for this period is spent. Enable paid credit in .env ' +
-        '(PAID_CREDITS_ENABLED and PAID_CREDIT_LIMIT) to continue, or wait for the monthly reset.',
+      (detail ?? 'The Solana Tracker allowance for this period is spent.') +
+        ' Top up or upgrade at solanatracker.io/data-api, or wait for the monthly reset. ' +
+        'Tokens added to the free trade logger keep recording in the meantime, at no cost.',
     );
     this.name = 'QuotaExhaustedError';
   }
@@ -160,7 +161,18 @@ async function request<T>(
     record('solanatracker', tier, path, res.ok);
 
     if (res.ok) {
+      clearExhausted('solanatracker');
       return (await res.json()) as T;
+    }
+
+    // Out of credit is an account-level dead end, not a per-request failure: retrying it
+    // just burns time, and every later call in the run will fail the same way.
+    if (res.status === 402 || res.status === 403) {
+      const body = await res.clone().text().catch(() => '');
+      if (/credit|quota|limit/i.test(body)) {
+        markExhausted('solanatracker', body.slice(0, 200));
+        throw new QuotaExhaustedError(body.includes('credit') ? 'Solana Tracker reports no credits left.' : undefined);
+      }
     }
 
     // 429 and 5xx are worth retrying; everything else is a permanent answer.
@@ -202,8 +214,12 @@ async function describeFailure(res: Response): Promise<string> {
 
   switch (res.status) {
     case 401:
-    case 403:
       return 'Solana Tracker rejected the API key. Check SOLANA_TRACKER_API_KEY in your .env.';
+    case 403:
+      // 403 covers both a bad key and an empty balance, so the body decides which.
+      return /credit|quota|limit/i.test(detail)
+        ? 'Solana Tracker reports no credits left on this plan. Top up, upgrade, or wait for the reset.'
+        : 'Solana Tracker rejected the API key. Check SOLANA_TRACKER_API_KEY in your .env.';
     case 404:
       return "Solana Tracker has no data for that token — it may be too new, or the address may not be a token mint.";
     case 402:

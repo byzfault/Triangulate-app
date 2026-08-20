@@ -1,6 +1,7 @@
-import { api, BudgetExceededError, type RequestBudget } from '../../shared/client.js';
+import { api, BudgetExceededError, QuotaExhaustedError, type RequestBudget } from '../../shared/client.js';
 import { store } from './store.js';
 import { rankCandidates } from './confidence.js';
+import { cachedProfile, profileWallet } from '../../shared/walletProfile.js';
 import type { BuyEvent, Observation, TraceProgress, TraceResult } from './types.js';
 
 /**
@@ -34,12 +35,24 @@ export interface TraceOptions {
   windowSecs: number;
   /** Analyse only the wallet's first buy of each token, or every buy it made. */
   firstBuyOnly: boolean;
+  /**
+   * Ceiling on buy events per trace. Every buy is a window, and a window is a request the
+   * first time it is seen, so an active wallet with hundreds of buys needs a bound.
+   */
+  maxEvents: number;
   /** Minimum events a candidate must lead before it is listed. */
   minHits: number;
   /** Minimum distinct tokens a candidate must lead on. */
   minTokens: number;
   /** Drop high-frequency bots and market makers from the shortlist. */
   excludeBots: boolean;
+  /**
+   * Check each shortlisted wallet's own history to see whether it is a bot. One request per
+   * candidate, cached forever, and only ever run on wallets that already cleared the bar.
+   */
+  verifyCandidates: boolean;
+  /** Ceiling on those checks, so a broad trace can't quietly spend the month's quota. */
+  maxVerifications: number;
 }
 
 export const traceDefaults: TraceOptions = {
@@ -50,14 +63,27 @@ export const traceDefaults: TraceOptions = {
    */
   windowSecs: 60,
   /**
-   * The entry is the decision worth copying; later adds are position management and happen
-   * on the copier's own schedule, so they blur the signal.
+   * Off: every buy is analysed, not just the entry.
+   *
+   * Restricting to entries gives one event per token, so five tokens is five data points and
+   * nothing has enough observations to measure timing spread — the heaviest component. If a
+   * wallet is running a copy bot it mirrors adds as well as entries, so each of those is
+   * another chance to catch the same source at the same delay. More events is strictly more
+   * evidence here; the only cost is a request per new window, and they cache.
    */
-  firstBuyOnly: true,
+  firstBuyOnly: false,
+  maxEvents: 40,
   minHits: 2,
   minTokens: 2,
   /** Nobody copies an MEV bot, so they are removed rather than left cluttering the list. */
   excludeBots: true,
+  /**
+   * On by default. The in-window signals cannot see a sniper bot — it buys once per token,
+   * so inside any single window it is indistinguishable from a selective trader. Only its
+   * own history exposes it, and that costs one cached request per shortlisted wallet.
+   */
+  verifyCandidates: true,
+  maxVerifications: 12,
 };
 
 type Emit = (e: TraceProgress) => void;
@@ -89,6 +115,8 @@ export async function runTrace(
   let cachedWindows = 0;
   let considered = 0;
   let botsExcluded = 0;
+  let botsUnmasked = 0;
+  let verified = 0;
 
   // ---- Phase 1: the follower's own buys ------------------------------------------------
   emit({ type: 'phase', phase: 'history', detail: 'Reading the followed wallet’s trade history' });
@@ -112,12 +140,23 @@ export async function runTrace(
   }
 
   // One entry per token, or every buy, depending on the option.
-  const events: BuyEvent[] = [];
+  const allEvents: BuyEvent[] = [];
   const seenToken = new Set<string>();
   for (const b of [...buys.list].sort((a, z) => a.time - z.time)) {
     if (opts.firstBuyOnly && seenToken.has(b.mint)) continue;
     seenToken.add(b.mint);
-    events.push({ ...b, source: 'solanatracker', scannedBuys: 0, windowIncomplete: false });
+    allEvents.push({ ...b, source: 'solanatracker', scannedBuys: 0, windowIncomplete: false });
+  }
+
+  // When capped, keep the most recent buys: they are the ones whose windows the free logger
+  // may already cover, and recent behaviour is what is worth attributing.
+  const events = allEvents.slice(-opts.maxEvents);
+  if (allEvents.length > events.length) {
+    warn(
+      'capped',
+      `${allEvents.length} buys found across those tokens; the most recent ${events.length} were analysed. ` +
+        `Raise the cap in Settings to go further back, at one request per new buy.`,
+    );
   }
 
   // ---- Phase 2: who bought just before, per event ---------------------------------------
@@ -183,7 +222,9 @@ export async function runTrace(
           );
         }
       } catch (err) {
-        if (err instanceof BudgetExceededError) throw err;
+        // An empty account fails every remaining window identically, so stop rather than
+        // repeating the same error forty times.
+        if (err instanceof BudgetExceededError || err instanceof QuotaExhaustedError) throw err;
         warn('partial', `${event.symbol}: couldn’t read the trades before this buy (${(err as Error).message}).`);
         continue;
       }
@@ -236,7 +277,51 @@ export async function runTrace(
     );
   }
 
-  return finish(events, candidates, eventsAllTime);
+  // ---- Phase 4: verify the shortlist against each wallet's own history -------------------
+  // The cheap in-window signals cannot catch a sniper bot, so the wallets that survived them
+  // are checked properly. Only the shortlist is checked, and each result is cached forever.
+  if (opts.verifyCandidates && candidates.length > 0) {
+    const shortlist = candidates.filter((c) => c.meetsBar).slice(0, opts.maxVerifications);
+
+    for (const [i, c] of shortlist.entries()) {
+      emit({
+        type: 'phase',
+        phase: 'verify',
+        detail: `Checking candidate ${i + 1}/${shortlist.length} for bot behaviour`,
+      });
+      try {
+        const profile = (await profileWallet(c.wallet, budget)) ?? cachedProfile(c.wallet);
+        if (!profile) continue;
+        verified += 1;
+        c.profile = {
+          tradesPerDay: Math.round(profile.tradesPerDay),
+          distinctTokens: profile.distinctTokens,
+          isBot: profile.isBot,
+          reason: profile.reason,
+        };
+        if (profile.isBot) botsUnmasked += 1;
+      } catch (err) {
+        if (err instanceof BudgetExceededError || err instanceof QuotaExhaustedError) throw err;
+        // An unverifiable wallet stays on the list, unjudged.
+      }
+    }
+
+    if (botsUnmasked > 0) {
+      warn(
+        'notice',
+        `${botsUnmasked} shortlisted wallet${botsUnmasked === 1 ? ' was' : 's were'} unmasked as bots by their own ` +
+          `trade history — they buy once on hundreds of tokens, which no in-window signal can distinguish from a ` +
+          `selective trader.`,
+      );
+    }
+  }
+
+  // Confirmed bots are removed from the shortlist entirely when the filter is on.
+  const finalCandidates = opts.excludeBots
+    ? candidates.filter((c) => !c.profile?.isBot)
+    : candidates;
+
+  return finish(events, finalCandidates, eventsAllTime);
 
   function finish(evs: BuyEvent[], cands: TraceResult['candidates'], allTime?: number): TraceResult {
     return {
@@ -255,6 +340,8 @@ export async function runTrace(
         eventsAllTime: allTime ?? evs.length,
         candidatesConsidered: considered,
         botsExcluded,
+        botsUnmasked,
+        verified,
         elapsedMs: Date.now() - startedAt,
       },
     };

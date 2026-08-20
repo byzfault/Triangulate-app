@@ -60,6 +60,13 @@ export interface Candidate {
   gate: number;
   /** Whether it cleared the minimum leads and token-repeat thresholds. */
   meetsBar: boolean;
+  /** Verdict from the wallet's own history, present only once it has been verified. */
+  profile?: {
+    tradesPerDay: number;
+    distinctTokens: number;
+    isBot: boolean;
+    reason: string | null;
+  };
   perToken: Array<{ mint: string; symbol: string; leadMs: number }>;
   firstSeen: number;
   lastSeen: number;
@@ -81,6 +88,10 @@ export interface TraceResult {
     eventsAllTime: number;
     candidatesConsidered: number;
     botsExcluded: number;
+    /** Shortlisted wallets exposed as bots by their own history. */
+    botsUnmasked: number;
+    /** Shortlisted wallets whose history was checked. */
+    verified: number;
     elapsedMs: number;
   };
 }

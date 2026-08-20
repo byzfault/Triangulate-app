@@ -5,6 +5,7 @@ import { config } from '../../shared/config.js';
 import { JobRegistry } from '../../shared/jobs.js';
 import { runTrace, traceDefaults, type TraceOptions } from './trace.js';
 import { confidenceConfig, rankCandidates } from './confidence.js';
+import { cachedProfile } from '../../shared/walletProfile.js';
 import { loggerStatus, startLogger, stopLogger, trackToken } from './logger.js';
 import { store } from './store.js';
 import type { TraceProgress } from './types.js';
@@ -39,10 +40,30 @@ export function registerCopyTracker(app: FastifyInstance) {
         excludeBots: req.query.excludeBots !== 'false',
       });
 
+      // Verdicts already paid for are reused here, so a wallet unmasked as a bot on a
+      // previous run stays off the list without another request.
+      const excludeBots = req.query.excludeBots !== 'false';
+      const withProfiles = ranked.candidates.map((c) => {
+        const p = cachedProfile(c.wallet);
+        return p
+          ? {
+              ...c,
+              profile: {
+                tradesPerDay: Math.round(p.tradesPerDay),
+                distinctTokens: p.distinctTokens,
+                isBot: p.isBot,
+                reason: p.reason,
+              },
+            }
+          : c;
+      });
+      const visible = excludeBots ? withProfiles.filter((c) => !c.profile?.isBot) : withProfiles;
+
       return {
         follower,
         label: store.listFollowers().find((f) => f.follower === follower)?.label ?? null,
-        candidates: ranked.candidates,
+        candidates: visible,
+        knownBots: withProfiles.filter((c) => c.profile?.isBot).length,
         considered: ranked.considered,
         botsExcluded: ranked.botsExcluded,
         events: history.events.length,
@@ -102,6 +123,10 @@ export function registerCopyTracker(app: FastifyInstance) {
     options.minHits = clampNum(options.minHits, 1, 50, traceDefaults.minHits);
     options.minTokens = clampNum(options.minTokens, 1, 8, traceDefaults.minTokens);
     options.excludeBots = req.body?.options?.excludeBots !== false;
+    options.verifyCandidates = req.body?.options?.verifyCandidates !== false;
+    options.firstBuyOnly = req.body?.options?.firstBuyOnly === true;
+    options.maxEvents = clampNum(options.maxEvents, 2, 200, traceDefaults.maxEvents);
+    options.maxVerifications = clampNum(options.maxVerifications, 0, 50, traceDefaults.maxVerifications);
 
     // Recorded before the trace runs, so the wallet appears in the dropdown even if the
     // trace then fails — the investigation exists from the moment it is started.

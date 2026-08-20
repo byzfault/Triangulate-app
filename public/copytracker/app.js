@@ -182,7 +182,9 @@
       candFoot.textContent =
         `From ${d.events} buy${d.events === 1 ? '' : 's'} across ${d.tokens} token` +
         `${d.tokens === 1 ? '' : 's'} on record · ${d.considered} wallets seen` +
-        (d.botsExcluded ? ` · ${d.botsExcluded} bots filtered out` : '');
+        (d.botsExcluded || d.knownBots
+          ? ` · ${d.botsExcluded + (d.knownBots || 0)} bots removed`
+          : '');
     } catch {
       candStatus.className = 'panel-status';
       candStatus.textContent = 'Could not load stored sources.';
@@ -259,6 +261,7 @@
     history: 'reading wallet history',
     window: 'scanning buy windows',
     scoring: 'scoring candidates',
+    verify: 'checking candidates for bot behaviour',
   };
 
   function setProgress(phase, detail) {
@@ -303,6 +306,7 @@
           options: {
             windowSecs: numOf('windowSecs', 60),
             firstBuyOnly: document.getElementById('firstBuyOnly').checked,
+            maxEvents: numOf('maxEvents', 40),
             minHits: numOf('minHits', 2),
             minTokens: numOf('minTokens', 2),
             excludeBots: document.getElementById('excludeBots').checked,
@@ -382,7 +386,10 @@
       `${result.stats.eventsAllTime} buy${result.stats.eventsAllTime === 1 ? '' : 's'} on record · ` +
       `${qualifying.length} met the bar` +
       (strong > 0 ? `, ${strong} scoring 7+` : '') +
-      (result.stats.botsExcluded ? ` · ${result.stats.botsExcluded} bots filtered out` : '');
+      (result.stats.botsExcluded || result.stats.botsUnmasked
+        ? ` · ${result.stats.botsExcluded + result.stats.botsUnmasked} bots removed`
+        : '') +
+      (result.stats.verified ? ` · ${result.stats.verified} histories checked` : '');
   }
 
   function renderCandidateRows(list) {
@@ -425,6 +432,13 @@
         '</a>' +
         '<span class="cand-tokens">' +
         c.perToken.map((t) => escapeHtml(t.symbol)).join(', ') +
+        (c.profile
+          ? ' · <span class="rate-tag' +
+            (c.profile.isBot ? ' is-bot' : '') +
+            '">' +
+            c.profile.tradesPerDay.toLocaleString() +
+            '/day</span>'
+          : '') +
         '</span></td>' +
         '<td class="num-col"><button type="button" class="badge ' +
         c.band +
