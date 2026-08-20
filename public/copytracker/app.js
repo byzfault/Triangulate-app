@@ -31,6 +31,10 @@
   const csvBtn = document.getElementById('csv');
   const usageEl = document.getElementById('usage');
 
+  const casesEl = document.getElementById('cases');
+  const casesEmpty = document.getElementById('casesEmpty');
+  const casesRefresh = document.getElementById('casesRefresh');
+
   const trackMint = document.getElementById('trackMint');
   const trackBtn = document.getElementById('trackBtn');
   const trackedBody = document.getElementById('trackedBody');
@@ -237,6 +241,7 @@
     document.getElementById(id).addEventListener('change', () => {
       const addr = followerEl.value.trim();
       if (BASE58.test(addr)) loadStoredCandidates(addr);
+      refreshCases();
     });
   }
 
@@ -356,6 +361,7 @@
         renderCandidates(e.result);
         renderEvents(e.result);
         refreshFollowers(e.result.follower);
+        refreshCases();
       } else if (e.type === 'error') {
         src.close();
         finish();
@@ -586,6 +592,104 @@
     URL.revokeObjectURL(a.href);
   });
 
+  // ---- case files: one persistent table per wallet under investigation -------------------------
+
+  async function refreshCases() {
+    let cases = [];
+    try {
+      const qs = new URLSearchParams({
+        minHits: String(numOf('minHits', 2)),
+        minTokens: String(numOf('minTokens', 2)),
+        excludeBots: String(document.getElementById('excludeBots').checked),
+      });
+      const res = await fetch('/api/copy/cases?' + qs);
+      cases = (await res.json()).cases || [];
+    } catch {
+      casesEmpty.hidden = false;
+      casesEmpty.textContent = 'Could not load case files.';
+      return;
+    }
+
+    casesEmpty.hidden = cases.length > 0;
+    casesEl.innerHTML = cases.map(renderCase).join('');
+
+    casesEl.querySelectorAll('[data-load]').forEach((b) =>
+      b.addEventListener('click', () => {
+        const addr = b.dataset.load;
+        followerEl.value = addr;
+        savedPick.value = addr;
+        const f = followers.find((x) => x.follower === addr);
+        labelEl.value = (f && f.label) || '';
+        describeFollower(f);
+        markValidity(followerEl, addr);
+        updateSubmit();
+        loadStoredCandidates(addr);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }),
+    );
+
+    casesEl.querySelectorAll('[data-forget]').forEach((b) =>
+      b.addEventListener('click', async () => {
+        const addr = b.dataset.forget;
+        const f = followers.find((x) => x.follower === addr);
+        // Deliberately confirmed: this throws away evidence that cost real requests to collect.
+        if (!window.confirm(
+          'Delete the case file for ' + ((f && f.label) || shortAddr(addr)) + '?\n\n' +
+          'Every buy and candidate recorded for it is discarded. Re-collecting them costs API requests.'
+        )) return;
+        await fetch('/api/copy/forget', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ follower: addr }),
+        });
+        await refreshFollowers();
+        refreshCases();
+      }),
+    );
+  }
+
+  function renderCase(c) {
+    const name = c.label || shortAddr(c.follower);
+    const rows = c.candidates.length
+      ? c.candidates
+          .map(
+            (x) =>
+              '<tr' + (x.meetsBar ? '' : ' class="is-belowbar"') + '>' +
+              '<td><a class="cand-wallet" href="https://solscan.io/account/' + x.wallet +
+              '" target="_blank" rel="noopener">' + shortAddr(x.wallet) + '</a>' +
+              '<span class="cand-tokens">' + x.perToken.map((t) => escapeHtml(t.symbol)).join(', ') +
+              (x.profile ? ' · <span class="rate-tag' + (x.profile.isBot ? ' is-bot' : '') + '">' +
+                x.profile.tradesPerDay.toLocaleString() + '/day</span>' : '') +
+              '</span></td>' +
+              '<td class="num-col"><span class="badge ' + x.band + '">' + x.score.toFixed(1) + '</span></td>' +
+              '<td class="num-col">' + x.hits + '<span class="cand-tokens">of ' + x.events + '</span></td>' +
+              '<td class="num-col cand-lead">' + formatLead(x.medianLeadMs) + '</td></tr>',
+          )
+          .join('')
+      : '<tr><td colspan="4" class="case-none">No candidate has cleared the bar yet.</td></tr>';
+
+    return (
+      '<div class="case">' +
+      '<div class="case-head">' +
+      '<div><span class="case-name">' + escapeHtml(name) + '</span>' +
+      '<span class="case-addr">' + c.follower + '</span></div>' +
+      '<div class="case-actions">' +
+      '<button type="button" class="btn-add" data-load="' + c.follower + '">Load</button>' +
+      '<button type="button" class="btn-add case-forget" data-forget="' + c.follower + '">Forget</button>' +
+      '</div></div>' +
+      '<p class="case-meta">' + c.events + ' buy' + (c.events === 1 ? '' : 's') + ' across ' + c.tokens +
+      ' token' + (c.tokens === 1 ? '' : 's') + ' · ' + c.considered + ' wallets seen · ' +
+      (c.botsExcluded + c.knownBots) + ' bots removed' +
+      (c.lastTraced ? ' · last traced ' + new Date(c.lastTraced).toLocaleDateString() : '') + '</p>' +
+      '<div class="table-scroll"><table class="cand-table"><thead><tr>' +
+      '<th>Suspected source</th><th class="num-col">Conf.</th><th class="num-col">Leads</th>' +
+      '<th class="num-col">Lead time</th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
+      '</div>'
+    );
+  }
+
+  casesRefresh.addEventListener('click', refreshCases);
+
   // ---- free logger ----------------------------------------------------------------------------
 
   async function refreshLogger() {
@@ -700,6 +804,7 @@
   render();
   updateSubmit();
   refreshFollowers();
+  refreshCases();
   refreshLogger();
   setInterval(refreshLogger, 30000);
 })();

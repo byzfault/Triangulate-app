@@ -14,6 +14,59 @@ const BASE58 = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
 
 const jobs = new JobRegistry<TraceProgress>();
 
+/**
+ * One wallet's case file, recomputed from the stored log. No API calls: everything here was
+ * paid for by earlier traces, so opening a case is always free however often it is done.
+ *
+ * Shared by the single-wallet endpoint and the all-cases overview so the two can never drift
+ * into disagreeing about the same wallet.
+ */
+function buildCase(
+  follower: string,
+  opts: { minHits: number; minTokens: number; excludeBots: boolean; limit?: number },
+) {
+  const history = store.history(follower);
+  const ranked = rankCandidates(history.observations, history.events, {
+    minHits: opts.minHits,
+    minTokens: opts.minTokens,
+    excludeBots: opts.excludeBots,
+  });
+
+  // Bot verdicts already paid for are reused, so a wallet unmasked on an earlier run stays
+  // off the list without spending another request.
+  const withProfiles = ranked.candidates.map((c) => {
+    const p = cachedProfile(c.wallet);
+    return p
+      ? {
+          ...c,
+          profile: {
+            tradesPerDay: Math.round(p.tradesPerDay),
+            distinctTokens: p.distinctTokens,
+            isBot: p.isBot,
+            reason: p.reason,
+          },
+        }
+      : c;
+  });
+  const knownBots = withProfiles.filter((c) => c.profile?.isBot).length;
+  let visible = opts.excludeBots ? withProfiles.filter((c) => !c.profile?.isBot) : withProfiles;
+  if (opts.limit !== undefined) visible = visible.slice(0, opts.limit);
+
+  const meta = store.listFollowers().find((f) => f.follower === follower);
+
+  return {
+    follower,
+    label: meta?.label ?? null,
+    lastTraced: meta?.last_traced ?? null,
+    candidates: visible,
+    considered: ranked.considered,
+    botsExcluded: ranked.botsExcluded,
+    knownBots,
+    events: history.events.length,
+    tokens: new Set(history.events.map((e) => e.mint)).size,
+  };
+}
+
 export function registerCopyTracker(app: FastifyInstance) {
   app.get('/api/copy/config', async () => ({
     defaults: traceDefaults,
@@ -32,42 +85,27 @@ export function registerCopyTracker(app: FastifyInstance) {
     async (req, reply) => {
       const follower = req.params.follower.trim();
       if (!BASE58.test(follower)) return reply.code(400).send({ error: 'Not a valid wallet address.' });
+      return buildCase(follower, readCaseOpts(req.query));
+    },
+  );
 
-      const history = store.history(follower);
-      const ranked = rankCandidates(history.observations, history.events, {
-        minHits: clampNum(req.query.minHits, 1, 50, traceDefaults.minHits),
-        minTokens: clampNum(req.query.minTokens, 1, 8, traceDefaults.minTokens),
-        excludeBots: req.query.excludeBots !== 'false',
-      });
-
-      // Verdicts already paid for are reused here, so a wallet unmasked as a bot on a
-      // previous run stays off the list without another request.
-      const excludeBots = req.query.excludeBots !== 'false';
-      const withProfiles = ranked.candidates.map((c) => {
-        const p = cachedProfile(c.wallet);
-        return p
-          ? {
-              ...c,
-              profile: {
-                tradesPerDay: Math.round(p.tradesPerDay),
-                distinctTokens: p.distinctTokens,
-                isBot: p.isBot,
-                reason: p.reason,
-              },
-            }
-          : c;
-      });
-      const visible = excludeBots ? withProfiles.filter((c) => !c.profile?.isBot) : withProfiles;
-
+  /**
+   * Every open investigation at once, each with its own shortlist.
+   *
+   * A wallet is rarely investigated alone — several are usually on the go, each accumulating
+   * its own sources — so the overview shows them side by side rather than making you select
+   * one at a time to remember what is where.
+   */
+  app.get<{ Querystring: { minHits?: string; minTokens?: string; excludeBots?: string; limit?: string } }>(
+    '/api/copy/cases',
+    async (req) => {
+      const opts = readCaseOpts(req.query);
+      const limit = clampNum(req.query.limit, 1, 50, 8);
       return {
-        follower,
-        label: store.listFollowers().find((f) => f.follower === follower)?.label ?? null,
-        candidates: visible,
-        knownBots: withProfiles.filter((c) => c.profile?.isBot).length,
-        considered: ranked.considered,
-        botsExcluded: ranked.botsExcluded,
-        events: history.events.length,
-        tokens: new Set(history.events.map((e) => e.mint)).size,
+        cases: store
+          .listFollowers()
+          .map((f) => buildCase(f.follower, { ...opts, limit }))
+          .filter((c) => c.events > 0),
       };
     },
   );
@@ -205,6 +243,14 @@ export function registerCopyTracker(app: FastifyInstance) {
     else startLogger();
     return loggerStatus();
   });
+}
+
+function readCaseOpts(q: { minHits?: string; minTokens?: string; excludeBots?: string }) {
+  return {
+    minHits: clampNum(q.minHits, 1, 50, traceDefaults.minHits),
+    minTokens: clampNum(q.minTokens, 1, 8, traceDefaults.minTokens),
+    excludeBots: q.excludeBots !== 'false',
+  };
 }
 
 function clampNum(v: unknown, lo: number, hi: number, fallback: number): number {

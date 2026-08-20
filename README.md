@@ -98,6 +98,15 @@ a script, and one accounting for more than 10% of all buying is providing liquid
 The filter abstains until there are at least three events to judge from, and can be switched
 off in Settings.
 
+### Several investigations at once
+
+A wallet is rarely investigated alone. Every wallet you trace keeps its own case file — its
+own buys, its own candidates, its own bot verdicts — and the **Case files** section shows all
+of them at once, each with its own shortlist. They are rebuilt from the stored log, so opening
+them costs nothing however often you look; loading three case files was measured at zero
+requests. "Load" pulls one back into the form to continue it, "Forget" discards it after a
+confirmation, since re-collecting that evidence costs real requests.
+
 ### It gets stronger over time
 
 Every buy ever analysed stays on record, and the score is computed over **all** of it, not

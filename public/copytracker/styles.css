@@ -133,3 +133,42 @@ tr.is-belowbar .badge{background:#a6b3bc;}
 /* Wallet-wide trade rate, the tell that separates a person from a scheduler. */
 .rate-tag{color:var(--muted);}
 .rate-tag.is-bot{color:var(--neg);font-weight:600;}
+
+/* Case files — one persistent shortlist per wallet under investigation. */
+.case{
+  border:1px solid var(--border-soft);
+  border-radius:6px;
+  margin-bottom:14px;
+  background:#fff;
+  overflow:hidden;
+}
+.case-head{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:14px;
+  padding:12px 16px 8px;
+  flex-wrap:wrap;
+}
+.case-name{
+  font-size:14px;
+  font-weight:600;
+  color:var(--label);
+  display:block;
+}
+.case-addr{
+  font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+  font-size:10.5px;
+  color:var(--muted);
+  word-break:break-all;
+}
+.case-actions{display:flex;gap:8px;flex:0 0 auto;}
+.case-forget:hover{color:var(--neg);border-color:var(--neg);}
+.case-meta{
+  font-size:11px;
+  color:var(--muted);
+  padding:0 16px 10px;
+  border-bottom:1px solid var(--border-soft);
+}
+.case .cand-table{font-size:12px;}
+.case-none{color:var(--muted);font-size:11.5px;padding:12px 10px;}
