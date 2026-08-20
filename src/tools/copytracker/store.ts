@@ -273,12 +273,26 @@ export const store = {
   },
 
   tracked() {
-    return db.prepare('SELECT mint, pool, symbol, added_at, last_poll FROM ct_tracked ORDER BY added_at').all() as Array<{
+    // The logged-trade count and watched span come from the log itself rather than a
+    // counter on the row, so they stay correct even if trades arrive from a trace rather
+    // than from a poll.
+    return db
+      .prepare(
+        `SELECT t.mint, t.pool, t.symbol, t.added_at, t.last_poll,
+                (SELECT COUNT(*) FROM ct_trade_log l WHERE l.mint = t.mint) AS trades,
+                (SELECT MIN(from_ts) FROM ct_log_coverage c WHERE c.mint = t.mint) AS covered_from,
+                (SELECT MAX(to_ts)   FROM ct_log_coverage c WHERE c.mint = t.mint) AS covered_to
+           FROM ct_tracked t ORDER BY t.added_at`,
+      )
+      .all() as Array<{
       mint: string;
       pool: string | null;
       symbol: string | null;
       added_at: number;
       last_poll: number | null;
+      trades: number;
+      covered_from: number | null;
+      covered_to: number | null;
     }>;
   },
 

@@ -438,7 +438,10 @@
             shortAddr(t.mint) +
             '</span></td>' +
             '<td class="num-col">' +
-            (t.pool ? '—' : 'no pool') +
+            (t.pool ? (t.trades || 0).toLocaleString() : '<em>no pool</em>') +
+            (t.covered_from && t.covered_to
+              ? '<span class="cand-tokens">' + coveredSpan(t.covered_from, t.covered_to) + ' watched</span>'
+              : '') +
             '</td><td>' +
             (t.last_poll ? new Date(t.last_poll).toLocaleTimeString() : 'never') +
             '</td>' +
@@ -510,6 +513,13 @@
 
   function shortAddr(a) {
     return a.slice(0, 4) + '…' + a.slice(-4);
+  }
+
+  function coveredSpan(from, to) {
+    const mins = Math.max(0, (to - from) / 60000);
+    if (mins < 90) return mins.toFixed(0) + 'min';
+    const hrs = mins / 60;
+    return hrs < 48 ? hrs.toFixed(1) + 'h' : (hrs / 24).toFixed(1) + 'd';
   }
 
   function formatLead(ms) {

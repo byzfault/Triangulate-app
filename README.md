@@ -94,6 +94,10 @@ another once is a coincidence, and no amount of scoring fixes a single data poin
 - **The window can be incomplete** on a very busy token, where 250 trades don't span the whole
   lookback. The UI flags those events rather than quietly under-reporting.
 - **A wallet that only ever received tokens** by transfer has no buy to anchor a window to.
+- **The free log has coarser timing than paid history.** GeckoTerminal reports whole seconds,
+  Solana Tracker milliseconds. Rounding compresses the spread of tight lead times, which
+  flatters timing regularity — the heaviest component. A candidate built purely from
+  free-logged windows can look marginally more machine-like than it is.
 
 ---
 

@@ -1,5 +1,4 @@
 import { api, BudgetExceededError, type RequestBudget } from '../../shared/client.js';
-import { cache } from '../../shared/cache.js';
 import { store } from './store.js';
 import { rankCandidates } from './confidence.js';
 import type { BuyEvent, Observation, TraceProgress, TraceResult } from './types.js';
@@ -142,6 +141,13 @@ export async function runTrace(
 
     // The free log first. It only ever holds recent activity, but when it does hold the
     // window it answers for nothing.
+    //
+    // Caveat worth knowing: GeckoTerminal reports whole seconds, where Solana Tracker
+    // reports milliseconds. Rounding compresses the spread of tight lead times, which
+    // flatters the timing-regularity component — the heaviest one in the score. A candidate
+    // established entirely from free windows can therefore look slightly more machine-like
+    // than it is. Mixed-source evidence is unaffected in practice, since the millisecond
+    // observations dominate the variance.
     let observations: Observation[] | null = null;
     if (store.coversWindow(event.mint, from, event.time)) {
       const rows = store.buysInWindow(event.mint, from, event.time);
@@ -377,13 +383,3 @@ function normaliseTime(t: unknown): number | null {
 }
 
 const short = (addr: string) => `${addr.slice(0, 4)}…${addr.slice(-4)}`;
-
-/** Symbols for the tokens in a trace, so the UI can label things without extra lookups. */
-export function symbolsFor(mints: string[]): Map<string, string> {
-  const out = new Map<string, string>();
-  for (const mint of mints) {
-    const meta = cache.getTokenMeta(mint);
-    if (meta) out.set(mint, meta.symbol);
-  }
-  return out;
-}
