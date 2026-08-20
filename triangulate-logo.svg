@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
+  <!-- Triangulate logo mark: three token nodes converge on one wallet -->
+  <!-- Triangle edges -->
+  <path d="M60 20 L102 92 L18 92 Z" fill="none" stroke="#cfd9de" stroke-width="4" stroke-linejoin="round"/>
+  <!-- Sight lines from each node to the center -->
+  <g stroke="#4dc0b5" stroke-width="2.5" stroke-dasharray="1 6" stroke-linecap="round">
+    <line x1="60" y1="20" x2="60" y2="68"/>
+    <line x1="102" y1="92" x2="60" y2="68"/>
+    <line x1="18" y1="92" x2="60" y2="68"/>
+  </g>
+  <!-- Token nodes -->
+  <circle cx="60" cy="20" r="8.5" fill="#47555f"/>
+  <circle cx="102" cy="92" r="8.5" fill="#47555f"/>
+  <circle cx="18" cy="92" r="8.5" fill="#47555f"/>
+  <!-- The found wallet -->
+  <circle cx="60" cy="68" r="12" fill="#4dc0b5"/>
+  <circle cx="60" cy="68" r="5" fill="#ffffff"/>
+</svg>

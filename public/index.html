@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wallet Triangulator</title>
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+
+<div class="layout">
+<div class="card" id="card">
+  <div class="card-header">
+    <h1>Enter 2 or more Solana token addresses to find profitable wallets</h1>
+  </div>
+  <div class="card-body">
+    <form id="form" novalidate>
+      <div id="rows"></div>
+      <div class="quick-fill">
+        <button type="button" class="btn-add" id="add">+ Add token address</button>
+        <button type="button" class="btn-add" id="fill7d" title="Fill the form with the top tokens by 7-day volume">Use top 7-day trending</button>
+      </div>
+
+      <details class="filters" id="filters">
+        <summary>Filters</summary>
+        <div class="filters-body">
+          <label class="check">
+            <span>Minimum ROI of
+              <input type="number" id="minRoiPercent" value="300" min="0" max="1000000" class="num"> %
+              on at least one token
+              <em>300% is a 4x. This is the filter that finds multipliers instead of whales.</em></span>
+          </label>
+          <label class="check">
+            <span>Minimum stake of $
+              <input type="number" id="minInvestedUsd" value="100" min="0" max="10000000" class="num">
+              <em>excludes dust positions whose huge ROI means nothing</em></span>
+          </label>
+          <label class="check">
+            <span>At most
+              <input type="number" id="maxBuysPerToken" value="10" min="1" max="1000" class="num"> buys per token
+              <em>conviction, not a script averaging in</em></span>
+          </label>
+          <label class="check">
+            <input type="checkbox" id="requireRealisedProfit" checked>
+            <span>Must have sold into profit <em>realised, not paper</em></span>
+          </label>
+          <label class="check">
+            <input type="checkbox" id="requireProfitOnAll" checked>
+            <span>Profitable on <strong>all</strong> queried tokens</span>
+          </label>
+          <label class="check indent" id="nOfMRow">
+            <span>…or on at least
+              <input type="number" id="minProfitableTokens" value="2" min="1" max="5" class="num"> of them</span>
+          </label>
+
+          <p class="group-label">Per-wallet verification — costs API requests</p>
+          <label class="check">
+            <input type="checkbox" id="checkWalletProfitability" checked>
+            <span>Wallet-wide ROI above
+              <input type="number" id="minWalletRoi" value="20" min="-100" max="100000" class="num"> %
+              <em>the main quality bar — catches wallets that look good on one token but lose overall</em></span>
+          </label>
+          <label class="check indent">
+            <span>Win rate above
+              <input type="number" id="minWinRate" value="0" min="0" max="100" class="num"> %
+              <em>0 = off. Leave it off: high win rate selects scalpers, and the best traders
+              lose often and win huge (one tested at 64% ROI on a 33% win rate).</em></span>
+          </label>
+          <label class="check">
+            <input type="checkbox" id="checkRecentActivity">
+            <span>At most
+              <input type="number" id="maxTradesInWindow" value="50" min="1" max="10000" class="num"> trades in the last
+              <input type="number" id="activityWindowDays" value="3" min="1" max="365" class="num"> days
+              <em>off by default — frequency doesn't separate skill, and it conflicts with
+              requiring the wallet to hold several specific tokens</em></span>
+          </label>
+          <label class="check indent">
+            <span>Verify at most
+              <input type="number" id="maxWalletChecks" value="40" min="1" max="500" class="num"> wallets, highest ROI first</span>
+          </label>
+
+          <label class="check">
+            <input type="checkbox" id="refresh">
+            <span>Ignore cache and refetch</span>
+          </label>
+          <p class="filters-foot">Snipers, bots, deployers and arbitrage accounts are always removed — they are
+            never what you're looking for, so there's no switch for them.</p>
+        </div>
+      </details>
+
+      <button type="submit" class="btn-submit" id="submit" disabled>
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true">
+          <circle cx="11" cy="11" r="7"></circle>
+          <line x1="21" y1="21" x2="16.5" y2="16.5"></line>
+        </svg>
+        Find Wallets
+      </button>
+      <p class="hint" id="hint">Paste at least 2 token mint addresses to search</p>
+    </form>
+
+    <div class="progress" id="progress" hidden>
+      <ul class="progress-list" id="progressList"></ul>
+      <p class="counter" id="counter">0 API requests</p>
+    </div>
+
+    <div class="notices" id="notices"></div>
+  </div>
+</div>
+
+<div class="panels">
+  <aside class="card panel" id="panel24h">
+    <div class="card-header"><h1>Trending · 24h volume</h1></div>
+    <div class="panel-body">
+      <p class="panel-status" id="status24h">Loading…</p>
+      <ul class="trend-list" id="list24h"></ul>
+      <p class="panel-foot" id="foot24h"></p>
+    </div>
+  </aside>
+
+  <aside class="card panel" id="panel7d">
+    <div class="card-header"><h1>Trending · 7-day volume</h1></div>
+    <div class="panel-body">
+      <p class="panel-status" id="status7d">Loading…</p>
+      <ul class="trend-list" id="list7d"></ul>
+      <p class="panel-foot" id="foot7d"></p>
+    </div>
+  </aside>
+</div>
+</div>
+
+<section class="results" id="results" hidden>
+  <div class="results-head">
+    <div>
+      <h2 id="resultsTitle">Results</h2>
+      <p class="results-sub" id="resultsSub"></p>
+    </div>
+    <button type="button" class="btn-csv" id="csv">Export CSV</button>
+  </div>
+  <div class="table-scroll">
+    <table id="table">
+      <thead id="thead"></thead>
+      <tbody id="tbody"></tbody>
+    </table>
+  </div>
+  <p class="empty" id="empty" hidden></p>
+  <footer class="usage" id="usage"></footer>
+</section>
+
+<script src="/app.js"></script>
+</body>
+</html>

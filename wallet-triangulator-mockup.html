@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wallet Triangulator</title>
+<style>
+  :root{
+    --teal:#4dc0b5;
+    --teal-dark:#3fb2a7;
+    --teal-tint:#f0fbfa;
+    --border:#d3dce1;
+    --border-soft:#e4e9ec;
+    --label:#47555f;
+    --title:#66808e;
+    --text:#3d4852;
+    --muted:#8795a1;
+    --invalid:#e08585;
+    --page:#eef1f3;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Open Sans",Helvetica,Arial,sans-serif;
+    background:var(--page);
+    color:var(--text);
+    display:flex;
+    justify-content:center;
+    align-items:flex-start;
+    min-height:100vh;
+    padding:40px 16px;
+  }
+  .card{
+    background:#fff;
+    width:100%;
+    max-width:400px;
+    border:1px solid var(--border-soft);
+    border-radius:6px;
+    box-shadow:0 2px 6px rgba(60,80,90,0.08);
+    overflow:hidden;
+  }
+  .card-header{
+    background:#f7f9fa;
+    border-bottom:1px solid var(--border-soft);
+    padding:22px 28px;
+    text-align:center;
+  }
+  .card-header h1{
+    font-size:18px;
+    font-weight:400;
+    color:var(--title);
+    line-height:1.45;
+  }
+  .card-body{padding:26px 28px 28px;}
+  .row{margin-bottom:18px;}
+  .row label{
+    display:block;
+    font-size:14px;
+    font-weight:600;
+    color:var(--label);
+    margin-bottom:8px;
+  }
+  .input-wrap{display:flex;gap:8px;}
+  .input-wrap input{
+    flex:1;
+    min-width:0;
+    font-size:14px;
+    font-family:inherit;
+    color:var(--text);
+    padding:11px 12px;
+    border:1px solid var(--border);
+    border-radius:4px;
+    outline:none;
+    transition:border-color .15s, background-color .15s;
+  }
+  .input-wrap input::placeholder{color:#b8c2cb;}
+  .input-wrap input:focus{
+    border-color:var(--teal);
+    background:var(--teal-tint);
+  }
+  .input-wrap input.invalid{
+    border-color:var(--invalid);
+    background:#fdf6f6;
+  }
+  .field-error{
+    display:none;
+    font-size:12px;
+    color:#c96a6a;
+    margin-top:6px;
+  }
+  .row.has-error .field-error{display:block;}
+  .btn-remove{
+    flex:0 0 auto;
+    width:42px;
+    border:1px solid var(--border);
+    border-radius:4px;
+    background:#fff;
+    color:#7a8a95;
+    font-size:18px;
+    line-height:1;
+    cursor:pointer;
+    transition:background-color .15s;
+  }
+  .btn-remove:hover{background:#f6f8f9;}
+  .btn-remove:focus-visible{outline:2px solid var(--teal);outline-offset:1px;}
+  .btn-add{
+    display:inline-block;
+    font-size:14px;
+    font-weight:600;
+    font-family:inherit;
+    color:#5a6b76;
+    background:#fff;
+    border:1px solid var(--border);
+    border-radius:4px;
+    padding:9px 14px;
+    cursor:pointer;
+    margin-bottom:22px;
+    transition:background-color .15s;
+  }
+  .btn-add:hover{background:#f6f8f9;}
+  .btn-add:focus-visible{outline:2px solid var(--teal);outline-offset:1px;}
+  .btn-add[disabled]{opacity:.45;cursor:default;background:#fff;}
+  .btn-submit{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:9px;
+    width:100%;
+    font-size:16px;
+    font-weight:600;
+    font-family:inherit;
+    color:#fff;
+    background:var(--teal);
+    border:none;
+    border-radius:4px;
+    padding:13px 16px;
+    cursor:pointer;
+    transition:background-color .15s;
+  }
+  .btn-submit:hover{background:var(--teal-dark);}
+  .btn-submit:focus-visible{outline:2px solid var(--teal-dark);outline-offset:2px;}
+  .btn-submit[disabled]{
+    background:#b9dedb;
+    cursor:default;
+  }
+  .btn-submit svg{flex:0 0 auto;}
+  .hint{
+    font-size:12px;
+    color:var(--muted);
+    text-align:center;
+    margin-top:12px;
+  }
+  .notice{
+    display:none;
+    margin-top:18px;
+    font-size:13px;
+    line-height:1.5;
+    color:#4a6a75;
+    background:#eef7f6;
+    border:1px solid #cfe9e6;
+    border-radius:4px;
+    padding:12px 14px;
+  }
+  .notice.show{display:block;}
+  @media (prefers-reduced-motion: reduce){
+    *{transition:none !important;}
+  }
+</style>
+</head>
+<body>
+
+<div class="card">
+  <div class="card-header">
+    <h1>Enter 2 or more Solana token addresses to find profitable wallets</h1>
+  </div>
+  <div class="card-body">
+    <form id="form" novalidate>
+      <div id="rows"></div>
+      <button type="button" class="btn-add" id="add">+ Add token address</button>
+      <button type="submit" class="btn-submit" id="submit" disabled>
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true">
+          <circle cx="11" cy="11" r="7"></circle>
+          <line x1="21" y1="21" x2="16.5" y2="16.5"></line>
+        </svg>
+        Find Wallets
+      </button>
+      <p class="hint" id="hint">Paste at least 2 token mint addresses to search</p>
+      <div class="notice" id="notice">
+        Mockup only — the wallet search isn't wired up yet. Next step is connecting this form to the backend.
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+(function(){
+  const MAX_ROWS = 5;
+  const BASE58 = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
+
+  const rowsEl   = document.getElementById('rows');
+  const addBtn   = document.getElementById('add');
+  const submitBtn= document.getElementById('submit');
+  const form     = document.getElementById('form');
+  const notice   = document.getElementById('notice');
+  const hint     = document.getElementById('hint');
+
+  let rows = ['']; // one field to start
+
+  function render(){
+    const focused = document.activeElement;
+    const focusIdx = focused && focused.dataset ? focused.dataset.idx : null;
+
+    rowsEl.innerHTML = '';
+    rows.forEach((val, i) => {
+      const row = document.createElement('div');
+      row.className = 'row';
+
+      const label = document.createElement('label');
+      label.textContent = 'Token address ' + (i + 1);
+      label.htmlFor = 'token-' + i;
+
+      const wrap = document.createElement('div');
+      wrap.className = 'input-wrap';
+
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.id = 'token-' + i;
+      input.dataset.idx = i;
+      input.value = val;
+      input.placeholder = 'Solana token mint address';
+      input.spellcheck = false;
+      input.autocomplete = 'off';
+      input.addEventListener('input', e => {
+        rows[i] = e.target.value.trim();
+        validateField(input, row, i);
+        updateSubmit();
+      });
+      input.addEventListener('blur', () => validateField(input, row, i));
+
+      wrap.appendChild(input);
+
+      if (rows.length >= 2){
+        const rm = document.createElement('button');
+        rm.type = 'button';
+        rm.className = 'btn-remove';
+        rm.setAttribute('aria-label', 'Remove token address ' + (i + 1));
+        rm.textContent = '\u00d7';
+        rm.addEventListener('click', () => {
+          rows.splice(i, 1);
+          render();
+          updateSubmit();
+        });
+        wrap.appendChild(rm);
+      }
+
+      const err = document.createElement('p');
+      err.className = 'field-error';
+      err.textContent = "This doesn't look like a valid Solana address";
+
+      row.appendChild(label);
+      row.appendChild(wrap);
+      row.appendChild(err);
+      rowsEl.appendChild(row);
+
+      validateField(input, row, i, true);
+    });
+
+    addBtn.disabled = rows.length >= MAX_ROWS;
+    addBtn.textContent = rows.length >= MAX_ROWS
+      ? 'Maximum of ' + MAX_ROWS + ' tokens'
+      : '+ Add token address';
+
+    if (focusIdx !== null){
+      const el = document.querySelector('input[data-idx="' + focusIdx + '"]');
+      if (el) el.focus();
+    }
+  }
+
+  function validateField(input, row, i, quiet){
+    const v = rows[i];
+    const bad = v.length > 0 && !BASE58.test(v);
+    input.classList.toggle('invalid', bad && !quiet);
+    row.classList.toggle('has-error', bad && !quiet);
+    return !bad;
+  }
+
+  function validCount(){
+    return rows.filter(v => BASE58.test(v)).length;
+  }
+
+  function updateSubmit(){
+    const anyBad = rows.some(v => v.length > 0 && !BASE58.test(v));
+    submitBtn.disabled = validCount() < 2 || anyBad;
+  }
+
+  addBtn.addEventListener('click', () => {
+    if (rows.length < MAX_ROWS){
+      rows.push('');
+      render();
+      updateSubmit();
+      const last = document.querySelector('input[data-idx="' + (rows.length - 1) + '"]');
+      if (last) last.focus();
+    }
+  });
+
+  form.addEventListener('submit', e => {
+    e.preventDefault();
+    if (submitBtn.disabled) return;
+    submitBtn.disabled = true;
+    const original = submitBtn.innerHTML;
+    submitBtn.textContent = 'Searching\u2026';
+    setTimeout(() => {
+      submitBtn.innerHTML = original;
+      updateSubmit();
+      notice.classList.add('show');
+    }, 1200);
+  });
+
+  render();
+  updateSubmit();
+})();
+</script>
+
+</body>
+</html>
