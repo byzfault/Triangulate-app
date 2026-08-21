@@ -1,4 +1,4 @@
-# Solana Toolkit
+# Triangulate app
 
 A suite of local Solana wallet-analysis tools, sharing one server, one cache and one API
 budget. Single user, no auth, runs on `127.0.0.1`.
